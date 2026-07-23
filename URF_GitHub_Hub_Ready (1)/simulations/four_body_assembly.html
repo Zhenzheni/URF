@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Four-Body Assembly Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: #03030a; color: #e0ddd4; font-family: Georgia, serif; overflow: hidden; }
+#c { position: absolute; inset: 0; }
+
+#ui {
+  position: absolute; top: 0; left: 0; width: 252px; height: 100%;
+  background: rgba(3,3,10,0.94); border-right: 1px solid rgba(255,255,255,0.07);
+  display: flex; flex-direction: column; overflow-y: auto; z-index: 20;
+  backdrop-filter: blur(12px);
+  transform: translateX(0); transition: transform 0.26s cubic-bezier(.4,0,.2,1);
+}
+#ui.hidden { transform: translateX(-252px); }
+#tab { position: absolute; top: 50%; left: 0; z-index: 21; transform: translateY(-50%); transition: left 0.26s cubic-bezier(.4,0,.2,1); }
+#tab.open { left: 252px; }
+#tab-btn {
+  width: 16px; height: 56px; background: rgba(3,3,10,0.9);
+  border: 1px solid rgba(255,255,255,0.1); border-left: none;
+  border-radius: 0 4px 4px 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.3); font-size: 9px; transition: color 0.15s, background 0.15s;
+}
+#tab-btn:hover { color: #9cd; background: rgba(100,170,210,0.15); }
+#ui h1 { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: #9cd; padding: 15px 14px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); font-weight: normal; }
+#ui h2 { font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.24); padding: 9px 14px 3px; font-weight: normal; }
+.sec { border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 3px; }
+.cr { display: flex; align-items: center; padding: 3px 14px; gap: 6px; }
+.cr label { font-size: 9px; color: rgba(255,255,255,0.38); min-width: 110px; }
+.cr input[type=range] { flex:1; -webkit-appearance:none; height:2px; background:rgba(255,255,255,0.1); border-radius:1px; outline:none; cursor:pointer; }
+.cr input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:11px; height:11px; border-radius:50%; background:#9cd; cursor:pointer; }
+.cr .v { font-size:9px; color:#9cd; min-width:36px; text-align:right; font-family:monospace; }
+.tr { display:flex; align-items:center; justify-content:space-between; padding:3px 14px; }
+.tr label { font-size:9px; color:rgba(255,255,255,0.38); }
+.tog { position:relative; width:28px; height:15px; flex-shrink:0; }
+.tog input { opacity:0; width:0; height:0; position:absolute; }
+.tt { position:absolute; inset:0; background:rgba(255,255,255,0.1); border-radius:8px; cursor:pointer; transition:background 0.2s; }
+.tog input:checked + .tt { background:#9cd; }
+.tt::after { content:''; position:absolute; top:2px; left:2px; width:11px; height:11px; border-radius:50%; background:#fff; transition:transform 0.2s; }
+.tog input:checked + .tt::after { transform:translateX(13px); }
+#btns { padding:10px 14px; display:flex; flex-direction:column; gap:5px; margin-top:auto; }
+.btn { width:100%; padding:7px 0; border-radius:4px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.02); color:rgba(255,255,255,0.58); font-size:9px; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; transition:all 0.15s; font-family:Georgia,serif; }
+.btn:hover { background:rgba(100,170,210,0.14); border-color:#9cd; color:#fff; }
+.btn.on { background:rgba(100,170,210,0.2); border-color:#9cd; color:#9cd; }
+
+#badge {
+  position:absolute; top:14px; right:14px; z-index:10;
+  background:rgba(3,3,10,0.88); border:1px solid rgba(255,255,255,0.08);
+  border-radius:6px; padding:10px 14px; font-size:9px;
+  color:rgba(255,255,255,0.42); line-height:2.0; pointer-events:none;
+  backdrop-filter:blur(8px); max-width:220px;
+}
+.eq { color:#9cd; font-family:monospace; font-size:10px; }
+.res { color:rgba(180,220,120,0.8); font-size:8px; }
+
+#hint { position:absolute; bottom:14px; right:14px; z-index:10; font-size:8px; color:rgba(255,255,255,0.14); text-align:right; pointer-events:none; line-height:2; }
+
+.body-row { display:flex; align-items:center; justify-content:space-between; padding:3px 14px; }
+.body-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-right:6px; }
+.body-label { font-size:9px; color:rgba(255,255,255,0.38); flex:1; display:flex; align-items:center; }
+</style>
+</head>
+<body>
+<div id="c"></div>
+
+<div id="tab" class="open">
+  <button id="tab-btn" onclick="togglePanel()">◀</button>
+</div>
+
+<div id="ui">
+  <h1>Four-Body Assembly</h1>
+
+  <div class="sec">
+    <h2>Scale</h2>
+    <div class="cr"><label>Side length s</label><input type="range" id="s-s" min="0.3" max="2.0" step="0.01" value="1.0"><span class="v" id="v-s">1.00</span></div>
+  </div>
+
+  <div class="sec">
+    <h2>Body visibility</h2>
+    <div class="body-row"><span class="body-label"><span class="body-dot" style="background:#e05555"></span>Body A</span><label class="tog"><input type="checkbox" id="t-a" checked><span class="tt"></span></label></div>
+    <div class="body-row"><span class="body-label"><span class="body-dot" style="background:#4a9e6b"></span>Body B</span><label class="tog"><input type="checkbox" id="t-b" checked><span class="tt"></span></label></div>
+    <div class="body-row"><span class="body-label"><span class="body-dot" style="background:#4a7abf"></span>Body C</span><label class="tog"><input type="checkbox" id="t-c" checked><span class="tt"></span></label></div>
+    <div class="body-row"><span class="body-label"><span class="body-dot" style="background:#c4a83a"></span>Body D</span><label class="tog"><input type="checkbox" id="t-d" checked><span class="tt"></span></label></div>
+  </div>
+
+  <div class="sec">
+    <h2>Opacity</h2>
+    <div class="cr"><label>Sphere shells</label><input type="range" id="s-op" min="0" max="100" step="1" value="18"><span class="v" id="v-op">18%</span></div>
+    <div class="cr"><label>Arc skeleton</label><input type="range" id="s-sk" min="0" max="100" step="1" value="70"><span class="v" id="v-sk">70%</span></div>
+  </div>
+
+  <div class="sec">
+    <h2>Show layers</h2>
+    <div class="tr"><label>Sphere centres</label><label class="tog"><input type="checkbox" id="t-sc" checked><span class="tt"></span></label></div>
+    <div class="tr"><label>Arc edges</label><label class="tog"><input type="checkbox" id="t-arc" checked><span class="tt"></span></label></div>
+    <div class="tr"><label>Sphere shells (convex)</label><label class="tog"><input type="checkbox" id="t-sh" checked><span class="tt"></span></label></div>
+    <div class="tr"><label>Concave cavity</label><label class="tog"><input type="checkbox" id="t-cv"><span class="tt"></span></label></div>
+    <div class="tr"><label>Gap triangles</label><label class="tog"><input type="checkbox" id="t-gap" checked><span class="tt"></span></label></div>
+    <div class="tr"><label>Shared vertex</label><label class="tog"><input type="checkbox" id="t-sv" checked><span class="tt"></span></label></div>
+    <div class="tr"><label>Outer tet frame</label><label class="tog"><input type="checkbox" id="t-ot" checked><span class="tt"></span></label></div>
+    <div class="tr"><label>Centroid axes</label><label class="tog"><input type="checkbox" id="t-ca" checked><span class="tt"></span></label></div>
+  </div>
+
+  <div class="sec">
+    <h2>Concave / convex</h2>
+    <div class="cr"><label>Cavity opacity</label><input type="range" id="s-cv" min="0" max="100" step="1" value="22"><span class="v" id="v-cv">22%</span></div>
+    <div class="cr"><label>Cavity scale</label><input type="range" id="s-cs" min="50" max="100" step="1" value="85"><span class="v" id="v-cs">85%</span></div>
+  </div>
+
+  <div id="btns">
+    <button class="btn" id="btn-spin">↻  Slow spin</button>
+    <button class="btn" id="btn-reset">⊙  Reset view</button>
+  </div>
+</div>
+
+<div id="badge">
+  <div><span class="eq">gap = π sr</span> per vertex</div>
+  <div><span class="eq">4 × π = 4π sr</span> closes</div>
+  <div><span class="eq">centroid-to-vertex = √6/4</span></div>
+  <div><span class="eq">inradius = s/√24</span> cavity</div>
+  <div><span class="res">convex outer · concave inner</span></div>
+</div>
+
+<div id="hint">
+  drag · rotate free<br>
+  scroll · zoom<br>
+  right-drag · pan
+</div>
+
+<script>
+// ── Scene ──────────────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x03030a, 1);
+document.getElementById('c').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.01, 200);
+
+// Lighting
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+const dl1 = new THREE.DirectionalLight(0xffffff, 0.7); dl1.position.set(3,5,4); scene.add(dl1);
+const dl2 = new THREE.DirectionalLight(0x9cd4ff, 0.3); dl2.position.set(-4,-2,3); scene.add(dl2);
+
+// ── Free orbit (all axes) ──────────────────────────────────────────────────
+// Trackball-style: mouse drag rotates a quaternion freely
+const orb = {
+  q: new THREE.Quaternion(),   // current rotation
+  qDown: new THREE.Quaternion(),
+  vDown: new THREE.Vector3(),
+  r: 9,
+  pan: new THREE.Vector3(),
+  panDown: new THREE.Vector3(),
+  camPosDown: new THREE.Vector3(),
+  down: false,
+  rdown: false,
+  mx: 0, my: 0
+};
+
+const pivot = new THREE.Group();
+scene.add(pivot);
+
+camera.position.set(0, 0, orb.r);
+camera.lookAt(0, 0, 0);
+
+function screenToSphere(x, y) {
+  // Map screen coords to unit sphere for trackball
+  const w = window.innerWidth, h = window.innerHeight;
+  const nx = (2 * x / w - 1);
+  const ny = (1 - 2 * y / h);
+  const r2 = nx * nx + ny * ny;
+  if (r2 <= 1) return new THREE.Vector3(nx, ny, Math.sqrt(1 - r2)).normalize();
+  return new THREE.Vector3(nx, ny, 0).normalize();
+}
+
+const cvs = renderer.domElement;
+
+cvs.addEventListener('mousedown', e => {
+  orb.down = true;
+  orb.rdown = e.button === 2;
+  orb.mx = e.clientX; orb.my = e.clientY;
+  orb.qDown.copy(orb.q);
+  orb.vDown.copy(screenToSphere(e.clientX, e.clientY));
+  orb.panDown.copy(orb.pan);
+});
+cvs.addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('mouseup', () => { orb.down = false; });
+window.addEventListener('mousemove', e => {
+  if (!orb.down) return;
+  if (orb.rdown) {
+    // Pan
+    const dx = (e.clientX - orb.mx) * orb.r * 0.0012;
+    const dy = (e.clientY - orb.my) * orb.r * 0.0012;
+    orb.pan.set(orb.panDown.x - dx, orb.panDown.y + dy, orb.panDown.z);
+  } else {
+    // Trackball rotate
+    const vNow = screenToSphere(e.clientX, e.clientY);
+    const axis = new THREE.Vector3().crossVectors(orb.vDown, vNow);
+    const dot = Math.max(-1, Math.min(1, orb.vDown.dot(vNow)));
+    const angle = Math.acos(dot) * 2.2;
+    if (axis.length() > 0.0001) {
+      const dq = new THREE.Quaternion().setFromAxisAngle(axis.normalize(), angle);
+      orb.q.copy(dq).multiply(orb.qDown);
+    }
+  }
+});
+cvs.addEventListener('wheel', e => {
+  orb.r = Math.max(2, Math.min(40, orb.r + e.deltaY * 0.015));
+});
+
+// Touch support
+let touches = {};
+cvs.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    orb.down = true; orb.rdown = false;
+    orb.mx = e.touches[0].clientX; orb.my = e.touches[0].clientY;
+    orb.qDown.copy(orb.q);
+    orb.vDown.copy(screenToSphere(orb.mx, orb.my));
+  } else if (e.touches.length === 2) {
+    orb.down = false;
+    touches.d0 = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    touches.r0 = orb.r;
+  }
+}, { passive: false });
+cvs.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && orb.down) {
+    const vNow = screenToSphere(e.touches[0].clientX, e.touches[0].clientY);
+    const axis = new THREE.Vector3().crossVectors(orb.vDown, vNow);
+    const dot = Math.max(-1, Math.min(1, orb.vDown.dot(vNow)));
+    const angle = Math.acos(dot) * 2.2;
+    if (axis.length() > 0.0001) {
+      const dq = new THREE.Quaternion().setFromAxisAngle(axis.normalize(), angle);
+      orb.q.copy(dq).multiply(orb.qDown);
+    }
+  } else if (e.touches.length === 2 && touches.d0) {
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    orb.r = Math.max(2, Math.min(40, touches.r0 * touches.d0 / d));
+  }
+}, { passive: false });
+cvs.addEventListener('touchend', e => { orb.down = false; });
+
+// ── Geometry helpers ───────────────────────────────────────────────────────
+const PI = Math.PI;
+
+function ln(pts, col, op) {
+  const g = new THREE.BufferGeometry().setFromPoints(pts);
+  return new THREE.Line(g, new THREE.LineBasicMaterial({ color: col, transparent: op < 1, opacity: op }));
+}
+
+function sp(pos, r, col, op) {
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(r, 24, 16),
+    new THREE.MeshPhongMaterial({ color: col, transparent: op < 1, opacity: op, shininess: 80, depthWrite: op > 0.5 })
+  );
+  m.position.copy(pos);
+  return m;
+}
+
+function shellSphere(pos, r, col, op) {
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(r, 32, 24),
+    new THREE.MeshPhongMaterial({ color: col, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false, shininess: 30 })
+  );
+  m.position.copy(pos);
+  return m;
+}
+
+function arc(centre, from, to, nSeg, col, op) {
+  const pts = [];
+  const r2 = centre.distanceTo(from);
+  const cf = new THREE.Vector3().subVectors(from, centre).normalize();
+  const ct = new THREE.Vector3().subVectors(to, centre).normalize();
+  const axis = new THREE.Vector3().crossVectors(cf, ct).normalize();
+  const ang = cf.angleTo(ct);
+  for (let i = 0; i <= nSeg; i++) {
+    const a = (i / nSeg) * ang;
+    pts.push(cf.clone().applyAxisAngle(axis, a).multiplyScalar(r2).add(centre));
+  }
+  return ln(pts, col, op);
+}
+
+// Curved gap triangle: three arcs bounding the gap at a vertex
+// gap sits at the vertex where three sphere surfaces meet
+// Each arc is on one sphere, connecting the two gap-edge endpoints on that sphere
+function gapTriangle(v0, v1, v2, s, col, op, group) {
+  // The three gap endpoints are at s/√3 from the shared vertex
+  // which is the RT vertex. The gap edges are chords of the inner sphere.
+  // We approximate: arcs on each sphere surface between adjacent midpoints
+  // midpoint of arc from vi to vj (on sphere centred at vk) is the arc midpoint
+  const mAB = v0.clone().add(v1).multiplyScalar(0.5).normalize().multiplyScalar(s);
+  const mBC = v1.clone().add(v2).multiplyScalar(0.5).normalize().multiplyScalar(s);
+  const mCA = v2.clone().add(v0).multiplyScalar(0.5).normalize().multiplyScalar(s);
+  // Gap boundary: arcs between sphere-sphere intersection points
+  // Approximate by arcs on each of the three spheres
+  group.add(arc(v0, mAB, mCA, 32, col, op));
+  group.add(arc(v1, mBC, mAB, 32, col, op));
+  group.add(arc(v2, mCA, mBC, 32, col, op));
+}
+
+// ── Tetrahedron vertex positions ──────────────────────────────────────────
+// Standard regular tetrahedron inscribed in unit sphere
+// Vertices of a regular tetrahedron centred at origin
+function tetVerts(R) {
+  // Four vertices of regular tet, circumradius R
+  const v = [
+    new THREE.Vector3(0, R, 0),
+    new THREE.Vector3(2 * R * Math.sqrt(2) / 3, -R / 3, 0),
+    new THREE.Vector3(-R * Math.sqrt(2) / 3, -R / 3, R * Math.sqrt(6) / 3),
+    new THREE.Vector3(-R * Math.sqrt(2) / 3, -R / 3, -R * Math.sqrt(6) / 3)
+  ];
+  return v;
+}
+
+// ── Build the assembly ─────────────────────────────────────────────────────
+// Each RT body: four spheres of radius s, centres at vertices of a regular tet of side s
+// The shared vertex (join point) is at the origin
+// Each body has one vertex at origin, the other three pointing outward
+// The four body centroids sit at the vertices of an outer tetrahedron
+
+const groups = { bodies: [], gaps: [], sv: null, outerTet: null, centAxes: null };
+const bodyColors = [0xe05555, 0x4a9e6b, 0x4a7abf, 0xc4a83a];
+
+let S = {
+  s: 1.0,
+  opShell: 0.18,
+  opSkel: 0.70,
+  opCav: 0.22,
+  cavScale: 0.85,
+  showA: true, showB: true, showC: true, showD: true,
+  showSC: true, showArc: true, showSh: true, showCv: false, showGap: true,
+  showSV: true, showOT: true, showCA: true,
+  spinning: false
+};
+
+function buildAssembly() {
+  // Clear pivot
+  while (pivot.children.length) pivot.remove(pivot.children[0]);
+  groups.bodies = [];
+  groups.gaps = [];
+
+  const s = S.s;
+
+  // Outer tetrahedron: each body's "home" vertex is at the origin (shared join point)
+  // Body centroid is at distance √6/4 * s from the vertex
+  // So the four centroids sit at vertices of a tet with circumradius = √6/4 * s
+  // But here we set up each body so its vertex AT origin has its three sphere centres
+  // pointing outward. The three sphere centres of each body (excluding the shared vertex sphere)
+  // form a triangle. 
+
+  // Strategy: 
+  // Place shared vertex at origin.
+  // Each body contributes one sphere centred at the origin (the vertex sphere).
+  // Wait — actually each body has 4 sphere centres. One of those sphere centres
+  // is the shared vertex direction. The vertex of the RT body (where arcs meet)
+  // is NOT a sphere centre — it's the intersection of three sphere surfaces.
+  // The vertex sits at the intersection of spheres centred at v0,v1,v2 (3 of the 4 centres).
+  // 
+  // For the four-body assembly: the shared point is a VERTEX of each body.
+  // Each body's vertex = intersection of 3 sphere surfaces.
+  // The 3 sphere centres contributing to that vertex point outward from the shared point.
+  //
+  // For a regular tet body of side s:
+  // Place one vertex at origin. The 3 sphere centres adjacent to that vertex
+  // are at distance s from each other and at distance s from the opposite centre.
+  // The vertex is at intersection of spheres centred at those 3 centres.
+  // Distance from vertex to each adjacent sphere centre = s/√3 * √(2/3)... 
+  // Actually: for RT body, vertex = point equidistant from 3 sphere centres.
+  // In regular tet of side s, distance from vertex to adjacent sphere centre = s * √(2/3)... 
+  // No: in regular tet, distance from vertex to opposite face centroid = s*√(2/3).
+  // Distance from vertex to adjacent vertex = s (edge length = sphere radius = s).
+  // So sphere centre distance from vertex = s (they're adjacent vertices of the tet).
+
+  // So: body with vertex at origin.
+  // Three adjacent sphere centres at distance s from origin, 
+  // forming equilateral triangle, at angle arccos(-1/3) from each other as seen from origin.
+  // The fourth sphere centre (opposite vertex of tet) is further out.
+
+  // For 4 bodies to share a vertex:
+  // The 4 bodies' outer tet frames (centroid directions) point to the 4 vertices of an outer tet.
+  // Each body is oriented so its vertex faces the centre (origin).
+  
+  // The 4 outer tet vertex directions:
+  const outerR = s * Math.sqrt(6) / 4;  // centroid-to-vertex of RT body = √6/4 * s
+  // Actually centroid of a regular tet of side s is at distance s*√6/4 from each vertex.
+  // So the centroids of the 4 bodies sit at distance s*√6/4 from origin... 
+  // but the bodies are large (size s), so scale the outer tet appropriately.
+  // The 4 body centroids form a regular tet. 
+  // Centroid of each body is at s*√6/4 from its own vertex.
+  // So outer tet has circumradius = s*√6/4... but that puts centroids very close.
+  // The assembly: shared vertex at origin, each body centroid at √6/4 * s outward.
+  
+  const centR = s * Math.sqrt(6) / 4;
+  const outerVerts = tetVerts(centR);  // centroid positions of the 4 bodies
+
+  // For each body, build it oriented so its vertex (one of its tet vertices) is at origin.
+  // A regular tet: if centroid at C and vertex V, then V - C = direction * (s*√6/4).
+  // Body tet vertices: centroid + (vertex - centroid rotated to 4 positions).
+  
+  // Regular tet local vertices (centred at centroid, circumradius = s*√6/4):
+  // vertex 0 (the shared one, pointing toward origin): direction = -centDir
+  // vertices 1,2,3: the three other sphere centres
+  
+  const bodyGroups = [];
+  
+  for (let bi = 0; bi < 4; bi++) {
+    const show = [S.showA, S.showB, S.showC, S.showD][bi];
+    const col = bodyColors[bi];
+    const g = new THREE.Group();
+    g.visible = show;
+    pivot.add(g);
+    bodyGroups.push(g);
+
+    const centDir = outerVerts[bi].clone().normalize(); // direction from origin to centroid
+    const centPos = outerVerts[bi]; // centroid position
+
+    // Build the 4 sphere centres of this body.
+    // Tet of side s. Centroid at centPos. 
+    // One vertex (shared) at origin = centPos - centDir * (s*√6/4) ≈ origin. Check:
+    // centPos = centDir * (s*√6/4), so centPos - centDir*(s*√6/4) = 0. ✓
+    
+    // Local tet: circumradius = s*√(3/8) ... wait let me be exact.
+    // Regular tet side s: circumradius R = s*√6/4. Confirmed.
+    // So local tet vertices relative to centroid, circumradius s*√6/4:
+    // We need one vertex pointing in -centDir direction (toward origin).
+    
+    // Build local tet with vertex 0 in direction -centDir:
+    // Use tetVerts and rotate so vertex[0] = (0,1,0)*R aligns with -centDir.
+    const localVerts = tetVerts(s * Math.sqrt(6) / 4);
+    // localVerts[0] = (0, R, 0). We want this to point in -centDir.
+    const localV0dir = new THREE.Vector3(0, 1, 0);
+    const targetDir = centDir.clone().negate();
+    const rotQ = new THREE.Quaternion().setFromUnitVectors(localV0dir, targetDir);
+    
+    const sphereCentres = localVerts.map(lv => {
+      const rv = lv.clone().applyQuaternion(rotQ);
+      return rv.add(centPos);
+    });
+    // sphereCentres[0] should be at origin (the shared vertex direction sphere)
+    // But wait: the shared vertex is not a sphere centre — it's where 3 sphere surfaces meet.
+    // In the RT body, the vertex of the shape (where arcs intersect) is at the intersection
+    // of THREE sphere surfaces. The four sphere centres are the tet vertices.
+    // The body vertex is NOT one of the sphere centres — it's a point on 3 sphere surfaces simultaneously.
+    // 
+    // For a regular tet of side s:
+    // Take 3 adjacent sphere centres (e.g. centres 1,2,3). 
+    // The RT vertex adjacent to all three is at the point equidistant from 1,2,3 at distance s.
+    // That point is on the same side as centre 0 relative to the face (1,2,3).
+    // Actually: vertex of RT body at each tet vertex position — the tet vertex IS the RT vertex.
+    // The four sphere centres are the four tet vertices.
+    // The RT arc from centre i curves to centre j, with the arc on sphere k.
+    // The body vertex (corner) is where three arcs meet = intersection of 3 sphere surfaces.
+    // For a face of the tet (3 vertices forming a triangle), the RT arcs meeting there:
+    // The corner is the centroid of that face? No.
+    // 
+    // Actually in 3D RT construction: the "vertex" of the shape is at each tet vertex.
+    // The 4 sphere centres ARE the tet vertices. Each sphere is centred at one tet vertex, radius s.
+    // Three spheres intersect at two points; the one inside the tet is the RT "face centre".
+    // The corners of the RT body are at the 4 tet vertices (sphere centres themselves).
+    // So: corner = sphere centre. The shared vertex IS a sphere centre.
+    //
+    // So sphereCentres[0] ≈ origin is the shared sphere centre / vertex. ✓
+
+    // Draw sphere shells
+    if (S.showSh) {
+      sphereCentres.forEach((sc, i) => {
+        const shell = shellSphere(sc, s, col, S.opShell);
+        g.add(shell);
+      });
+    }
+
+    // Draw sphere centre dots
+    if (S.showSC) {
+      sphereCentres.forEach((sc, i) => {
+        g.add(sp(sc, s * 0.045, col, 0.9));
+      });
+    }
+
+    // Draw RT arcs (on each sphere, arc from one adjacent centre to another)
+    // For each pair of sphere centres (i,j), the arc lies on sphere centred at the THIRD centre k
+    // (the one equidistant from both arc endpoints, radius s)
+    // Actually: RT arc between centres ci and cj lies on sphere centred at ck where |ck-ci|=|ck-cj|=s
+    // In a regular tet, every pair (i,j) has two other centres (k,l). The arc on sphere k: 
+    // arc from ci to cj on sphere centred at ck (both ci and cj are at distance s from ck). ✓
+    
+    if (S.showArc) {
+      const pairs = [[0,1,2],[0,1,3],[0,2,3],[1,2,3],[0,2,1],[0,3,1],[0,3,2],[1,3,2]];
+      // Simpler: for each face (3 sphere centres), draw arcs on those 3 spheres
+      const faces = [[0,1,2],[0,1,3],[0,2,3],[1,2,3]];
+      faces.forEach(([a,b,c]) => {
+        // Arc from sc[a] to sc[b] on sphere centred at sc[c]
+        g.add(arc(sphereCentres[c], sphereCentres[a], sphereCentres[b], 48, col, S.opSkel));
+        g.add(arc(sphereCentres[a], sphereCentres[b], sphereCentres[c], 48, col, S.opSkel));
+        g.add(arc(sphereCentres[b], sphereCentres[a], sphereCentres[c], 48, col, S.opSkel));
+      });
+    }
+
+    // Gap triangle at the shared vertex (origin)
+    // The shared vertex is sphereCentres[0] ≈ origin
+    // Three adjacent sphere centres: 1,2,3
+    // Gap triangle bounds: arcs on the three spheres meeting at origin
+    const gapG = new THREE.Group();
+    gapG.visible = S.showGap;
+    if (S.showGap) {
+      // Gold gap highlight arcs
+      gapTriangle(
+        sphereCentres[1], sphereCentres[2], sphereCentres[3],
+        s, 0xffd700, 0.85, gapG
+      );
+    }
+    g.add(gapG);
+    groups.gaps.push(gapG);
+
+    // Concave cavity — inner intersection of the four spheres
+    // The intersection region of 4 spheres of radius s centred at tet vertices of side s
+    // forms a curved tetrahedral cavity. Its inradius = s*(√6/4 - 1/√3*√(2/3))
+    // Approximate: sphere centred at body centroid, radius = inradius of the tet * cavScale
+    // Inradius of regular tet side s = s/√24 = s*0.204 (this is the insphere radius)
+    // The inner cavity is bounded by 4 inward-curving spherical caps.
+    // We render it as: 4 inverted shell spheres at each sphere centre, small radius,
+    // representing the cavity boundary as seen from inside.
+    // More visually useful: a single sphere at the centroid showing the cavity volume.
+    const cavG = new THREE.Group();
+    cavG.visible = S.showCv;
+    if (S.showCv) {
+      // Inner cavity: render as 4 concave cap patches (inverted spheres at each centre)
+      // Each cap = a sphere shell centred at sphere centre, radius slightly less than s
+      // rendered with FrontSide only so interior is visible
+      const cavR = s * S.cavScale;
+      const cavCol = col; // same colour as body, different rendering
+      sphereCentres.forEach(sc => {
+        const capMesh = new THREE.Mesh(
+          new THREE.SphereGeometry(cavR, 32, 24),
+          new THREE.MeshPhongMaterial({
+            color: cavCol,
+            transparent: true,
+            opacity: S.opCav,
+            side: THREE.BackSide,  // render inside = concave surface
+            depthWrite: false,
+            shininess: 120,
+            emissive: cavCol,
+            emissiveIntensity: 0.08
+          })
+        );
+        capMesh.position.copy(sc);
+        cavG.add(capMesh);
+      });
+      // Central cavity void marker — small glowing sphere at centroid
+      const cavCent = new THREE.Mesh(
+        new THREE.SphereGeometry(s * 0.06, 16, 12),
+        new THREE.MeshPhongMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: S.opCav * 1.5,
+          emissive: col,
+          emissiveIntensity: 0.6,
+          shininess: 200
+        })
+      );
+      cavCent.position.copy(centPos);
+      cavG.add(cavCent);
+    }
+    g.add(cavG);
+
+    groups.bodies.push(g);
+  }
+
+  // Shared vertex marker
+  const svG = new THREE.Group();
+  svG.visible = S.showSV;
+  if (S.showSV) {
+    svG.add(sp(new THREE.Vector3(0,0,0), s * 0.07, 0xffffff, 1.0));
+    // Small glow ring
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(s * 0.12, s * 0.012, 8, 48),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 })
+    );
+    svG.add(ring);
+    const ring2 = ring.clone();
+    ring2.rotation.x = Math.PI / 2;
+    svG.add(ring2);
+  }
+  pivot.add(svG);
+  groups.sv = svG;
+
+  // Outer tet frame (connects the 4 centroids)
+  const otG = new THREE.Group();
+  otG.visible = S.showOT;
+  if (S.showOT) {
+    const ov = tetVerts(centR);
+    const edges = [[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
+    edges.forEach(([a,b]) => {
+      otG.add(ln([ov[a], ov[b]], 0x444455, 0.35));
+    });
+    // Centroid markers
+    ov.forEach((v,i) => {
+      otG.add(sp(v, s*0.03, bodyColors[i], 0.6));
+    });
+  }
+  pivot.add(otG);
+  groups.outerTet = otG;
+
+  // Centroid-to-shared-vertex axes
+  const caG = new THREE.Group();
+  caG.visible = S.showCA;
+  if (S.showCA) {
+    tetVerts(centR).forEach((v,i) => {
+      caG.add(ln([new THREE.Vector3(0,0,0), v], bodyColors[i], 0.22));
+    });
+  }
+  pivot.add(caG);
+  groups.centAxes = caG;
+}
+
+// ── Controls ───────────────────────────────────────────────────────────────
+function wr(id, vid, prop, dec, suf, rebuild) {
+  document.getElementById(id).addEventListener('input', function() {
+    S[prop] = parseFloat(this.value);
+    document.getElementById(vid).textContent = S[prop].toFixed(dec) + suf;
+    if (rebuild) buildAssembly();
+  });
+}
+wr('s-s', 'v-s', 's', 2, '', true);
+wr('s-op', 'v-op', 'opShell', 0, '%', true);
+wr('s-sk', 'v-sk', 'opSkel', 0, '%', true);
+
+// Actually convert % sliders to 0-1
+document.getElementById('s-op').addEventListener('input', function() {
+  S.opShell = parseFloat(this.value) / 100;
+  document.getElementById('v-op').textContent = this.value + '%';
+  buildAssembly();
+});
+document.getElementById('s-sk').addEventListener('input', function() {
+  S.opSkel = parseFloat(this.value) / 100;
+  document.getElementById('v-sk').textContent = this.value + '%';
+  buildAssembly();
+});
+
+const togMap = {
+  't-a': 'showA', 't-b': 'showB', 't-c': 'showC', 't-d': 'showD',
+  't-sc': 'showSC', 't-arc': 'showArc', 't-sh': 'showSh', 't-cv': 'showCv',
+  't-gap': 'showGap', 't-sv': 'showSV', 't-ot': 'showOT', 't-ca': 'showCA'
+};
+
+document.getElementById('s-cv').addEventListener('input', function() {
+  S.opCav = parseFloat(this.value) / 100;
+  document.getElementById('v-cv').textContent = this.value + '%';
+  buildAssembly();
+});
+document.getElementById('s-cs').addEventListener('input', function() {
+  S.cavScale = parseFloat(this.value) / 100;
+  document.getElementById('v-cs').textContent = this.value + '%';
+  buildAssembly();
+});
+Object.entries(togMap).forEach(([id, prop]) => {
+  document.getElementById(id).addEventListener('change', function() {
+    S[prop] = this.checked;
+    buildAssembly();
+  });
+});
+
+const btnSpin = document.getElementById('btn-spin');
+btnSpin.addEventListener('click', () => {
+  S.spinning = !S.spinning;
+  btnSpin.classList.toggle('on', S.spinning);
+  btnSpin.textContent = S.spinning ? '⏸  Pause spin' : '↻  Slow spin';
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  orb.q.set(0,0,0,1);
+  orb.r = 9;
+  orb.pan.set(0,0,0);
+});
+
+function togglePanel() {
+  const ui = document.getElementById('ui');
+  const tab = document.getElementById('tab');
+  const btn = document.getElementById('tab-btn');
+  const hidden = ui.classList.toggle('hidden');
+  tab.classList.toggle('open', !hidden);
+  btn.textContent = hidden ? '▶' : '◀';
+}
+
+// ── Animate ────────────────────────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (S.spinning) {
+    const dq = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0.2, 1, 0.1).normalize(), 0.004);
+    orb.q.multiply(dq);
+  }
+
+  // Apply trackball rotation to pivot group
+  pivot.quaternion.copy(orb.q);
+  pivot.position.copy(orb.pan);
+
+  camera.position.set(0, 0, orb.r);
+  camera.lookAt(0, 0, 0);
+
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+buildAssembly();
+animate();
+</script>
+</body>
+</html>

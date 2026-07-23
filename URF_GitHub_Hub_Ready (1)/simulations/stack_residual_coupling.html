@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>URF · Stacked Particles · Residual Coupling</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #07070f; color: #d8dce6; font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #ui {
+    position: absolute; top: 14px; left: 14px;
+    background: rgba(8,10,22,0.92); border: 1px solid #2a3555;
+    border-radius: 10px; padding: 14px 16px; min-width: 270px;
+    backdrop-filter: blur(8px); box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+  }
+  #ui h1 { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; color: #9eb6ff; margin-bottom: 10px; text-transform: uppercase; }
+  .row { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; font-size: 12px; }
+  .label { color: #8a93a8; }
+  .val { font-variant-numeric: tabular-nums; color: #e8ecf4; font-weight: 500; }
+  .bar-bg { height: 4px; background: #1a2035; border-radius: 2px; margin: 4px 0 8px; overflow: hidden; }
+  .bar { height: 100%; border-radius: 2px; }
+  .mode { display: inline-block; margin: 2px 4px 2px 0; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+  #hint { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #5a6478; }
+  button {
+    margin-top: 8px; width: 100%; padding: 7px;
+    background: #1a2440; border: 1px solid #3a4a70; color: #c8d0e8;
+    border-radius: 6px; cursor: pointer; font-size: 12px;
+  }
+  button:hover { background: #243056; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <h1>URF Stack · 4 Particles</h1>
+  <div class="row"><span class="label">Stack residual</span><span class="val" id="stack-stress">0.00</span></div>
+  <div class="bar-bg"><div class="bar" id="stack-bar" style="width:0%;background:#6a9fff"></div></div>
+  <div class="row"><span class="label">Coupling</span><span class="val" id="coupling">—</span></div>
+  <div class="row"><span class="label">Active flips</span><span class="val" id="flips">0</span></div>
+  <div id="modes" style="margin-top:8px"></div>
+  <button id="perturb">Perturb stack</button>
+  <button id="pause">Pause / Resume</button>
+</div>
+<div id="hint">Drag to rotate · Scroll to zoom · Residual coupling across membranes</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, dpr;
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+let t = 0, paused = false;
+let rotY = 0.35, rotX = 0.25, zoom = 0.72;
+let dragging = false, lx = 0, ly = 0;
+canvas.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointerup', () => { dragging = false; });
+canvas.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  rotY += (e.clientX - lx) * 0.008;
+  rotX += (e.clientY - ly) * 0.008;
+  rotX = Math.max(-1.1, Math.min(1.1, rotX));
+  lx = e.clientX; ly = e.clientY;
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoom *= e.deltaY > 0 ? 0.92 : 1.08;
+  zoom = Math.max(0.35, Math.min(2.2, zoom));
+}, { passive: false });
+
+document.getElementById('pause').onclick = () => { paused = !paused; };
+document.getElementById('perturb').onclick = () => {
+  for (const p of particles) {
+    p.phase += (Math.random() - 0.5) * 1.2;
+    if (Math.random() > 0.5) p.sign *= -1;
+  }
+};
+
+function hash(i, j) {
+  const x = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// Base irregular lobe template (shared shape noise)
+function makeLobeTemplate(seed) {
+  const pts = [];
+  const N = 28, M = 14;
+  for (let i = 0; i <= M; i++) {
+    const theta = (i / M) * Math.PI;
+    for (let j = 0; j <= N; j++) {
+      const phi = (j / N) * Math.PI * 2;
+      let dx = Math.sin(theta) * Math.cos(phi);
+      let dy = Math.cos(theta);
+      let dz = Math.sin(theta) * Math.sin(phi);
+      const n1 = hash(seed, i * 17 + j) - 0.5;
+      const n2 = hash(seed + 10, j * 13 + i) - 0.5;
+      const bump = 1 + 0.13 * n1 + 0.08 * n2 * Math.sin(3 * phi);
+      const gap = hash(seed + 5, i + j * 5) > 0.8 ? 0.7 : 1;
+      pts.push({ dx, dy, dz, r0: 0.42 * bump * gap });
+    }
+  }
+  return { pts, N, M };
+}
+
+// Four centres relative to particle origin — irregular
+const REL = [
+  [0.36, 0.30, 0.28],
+  [0.32, -0.30, -0.34],
+  [-0.34, 0.28, -0.30],
+  [-0.30, -0.32, 0.34]
+];
+
+const NPART = 4;
+const SPACING = 1.55; // vertical stack spacing
+const particles = [];
+for (let p = 0; p < NPART; p++) {
+  particles.push({
+    id: p,
+    y0: (p - (NPART - 1) / 2) * SPACING,
+    phase: p * 1.1 + Math.random() * 0.4, // offset phases
+    sign: p % 2 === 0 ? 1 : -1,           // alternating residual
+    flipTimer: 0,
+    lobes: [0,1,2,3].map(i => makeLobeTemplate(p * 20 + i * 3))
+  });
+}
+
+function project(x, y, z) {
+  let x1 = x * Math.cos(rotY) - z * Math.sin(rotY);
+  let z1 = x * Math.sin(rotY) + z * Math.cos(rotY);
+  let y1 = y * Math.cos(rotX) - z1 * Math.sin(rotX);
+  let z2 = y * Math.sin(rotX) + z1 * Math.cos(rotX);
+  const scale = 200 * zoom;
+  const depth = 5.5 + z2;
+  const f = scale / Math.max(0.5, depth);
+  return { x: W/2 + x1 * f, y: H/2 + y1 * f, z: z2, f };
+}
+
+function dynOf(p, time) {
+  const phase = (time * 0.5 + p.phase) % (Math.PI * 2);
+  const approach = 0.5 - 0.5 * Math.cos(phase);
+  const stressMag = 0.18 + 0.82 * Math.pow(approach, 1.55);
+  const plMag = stressMag / Math.sqrt(10);
+  let mode = 'KINETIC', col = '#7dcea0', bg = '#1e3a2f';
+  if (approach > 0.92) { mode = 'CAUSTIC'; col = '#ffd27a'; bg = '#3a2e14'; }
+  else if (approach > 0.75) { mode = 'PRISMATIC'; col = '#c9a0ff'; bg = '#2a1e3a'; }
+  else if (approach < 0.12) { mode = 'CRYPTIC'; col = '#8a9bb0'; bg = '#1a222e'; }
+  else if (approach < 0.28) { mode = 'SCOTOPIC'; col = '#6a8aaa'; bg = '#15202a'; }
+  return { phase, approach, stressMag, plMag, mode, col, bg };
+}
+
+function updateParticle(p, dyn, dt, neighbors) {
+  p.flipTimer += dt;
+  // spontaneous flip near own null
+  if (dyn.approach > 0.96 && p.flipTimer > 0.35) {
+    p.sign *= -1;
+    p.flipTimer = 0;
+  }
+  // sympathetic: if neighbour is near caustic and opposite sign, chance to couple
+  for (const n of neighbors) {
+    const nd = dynOf(n, t);
+    if (nd.approach > 0.88 && n.sign !== p.sign && dyn.approach > 0.4) {
+      // soft pull of phase toward neighbour (sympathetic)
+      p.phase += 0.015 * (n.phase - p.phase) * nd.stressMag;
+    }
+    // strong caustic on neighbour can force flip
+    if (nd.approach > 0.97 && Math.abs(p.y0 - n.y0) < SPACING * 1.2 && p.flipTimer > 0.5) {
+      if (Math.random() < 0.02 * nd.stressMag) {
+        p.sign = n.sign; // align
+        p.flipTimer = 0;
+      }
+    }
+  }
+}
+
+function distortedRel(li, p, dyn) {
+  const c = REL[li];
+  const pl = p.sign * dyn.plMag;
+  return [
+    c[0] * (1 + pl * 0.35 + 0.03 * Math.sin(t * 1.2 + li + p.id)),
+    c[1] * (1 - pl * 0.5 + 0.03 * Math.cos(t * 1.0 + li)),
+    c[2] * (1 + pl * 0.3 + 0.03 * Math.sin(t * 0.9 + li))
+  ];
+}
+
+function drawParticle(p, dyn) {
+  const baseY = p.y0;
+  // depth order lobes
+  const order = [0,1,2,3].map(i => {
+    const r = distortedRel(i, p, dyn);
+    const pr = project(r[0], r[1] + baseY, r[2]);
+    return { i, z: pr.z, r };
+  }).sort((a, b) => a.z - b.z);
+
+  for (const { i, r } of order) {
+    const lobe = p.lobes[i];
+    const { pts, N, M } = lobe;
+    const pl = p.sign * dyn.plMag;
+    const pulse = 1 + 0.1 * dyn.stressMag * Math.sin(t * 2.8 + i + p.id);
+    const pc = project(r[0], r[1] + baseY, r[2]);
+    const rad = 0.4 * pc.f * (1 + Math.abs(pl) * 0.18);
+    const col = p.sign > 0 ? 'rgba(90,140,255,' : 'rgba(255,120,90,';
+    const g = ctx.createRadialGradient(pc.x, pc.y, 0, pc.x, pc.y, rad * 1.25);
+    g.addColorStop(0, col + (0.18 + 0.12 * dyn.stressMag) + ')');
+    g.addColorStop(0.6, col + '0.06)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(pc.x, pc.y, rad * 1.25, 0, Math.PI * 2);
+    ctx.fill();
+
+    // irregular outline
+    ctx.beginPath();
+    let first = true;
+    for (let j = 0; j <= N; j++) {
+      const pt = pts[Math.floor(M * 0.5) * (N + 1) + (j % (N + 1))];
+      const rr = pt.r0 * pulse * (1 + pl * 0.12 * pt.dy);
+      const x = r[0] + pt.dx * rr;
+      const y = r[1] + baseY + pt.dy * rr;
+      const z = r[2] + pt.dz * rr;
+      const pr = project(x, y, z);
+      if (first) { ctx.moveTo(pr.x, pr.y); first = false; }
+      else ctx.lineTo(pr.x, pr.y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = p.sign > 0
+      ? `rgba(130,170,255,${0.3 + 0.25 * dyn.stressMag})`
+      : `rgba(255,150,120,${0.3 + 0.25 * dyn.stressMag})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // core
+  const o = project(0, baseY, 0);
+  const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, 11 * zoom);
+  g.addColorStop(0, 'rgba(255,255,255,0.9)');
+  g.addColorStop(0.4, 'rgba(180,210,255,0.35)');
+  g.addColorStop(1, 'rgba(100,140,255,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(o.x, o.y, 11 * zoom, 0, Math.PI * 2);
+  ctx.fill();
+
+  // caustic focus under particle when near null
+  if (dyn.approach > 0.7) {
+    const f = project(0, baseY + 0.85, 0);
+    const inten = Math.pow((dyn.approach - 0.7) / 0.3, 1.6);
+    const rad = 4 + 22 * inten;
+    const gg = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rad);
+    gg.addColorStop(0, `rgba(255,230,160,${0.7 * inten})`);
+    gg.addColorStop(1, 'rgba(255,160,40,0)');
+    ctx.fillStyle = gg;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, rad, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawCoupling(pA, dA, pB, dB) {
+  // solvent boundary / membrane between stack neighbours
+  const yA = pA.y0 + 0.55;
+  const yB = pB.y0 - 0.55;
+  const midY = (pA.y0 + pB.y0) / 2;
+  const strength = 0.5 * (dA.stressMag + dB.stressMag);
+  const same = pA.sign === pB.sign;
+
+  // membrane disk (solvent boundary)
+  const m = project(0, midY, 0);
+  const rad = 55 * zoom * (0.7 + 0.3 * strength);
+  ctx.beginPath();
+  ctx.ellipse(m.x, m.y, rad, rad * 0.22, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = same
+    ? `rgba(120,180,255,${0.15 + 0.25 * strength})`
+    : `rgba(255,160,100,${0.15 + 0.3 * strength})`;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  ctx.fillStyle = same
+    ? `rgba(80,130,220,${0.04 + 0.06 * strength})`
+    : `rgba(220,100,60,${0.04 + 0.08 * strength})`;
+  ctx.fill();
+
+  // sympathetic rays across membrane when both stressed
+  if (strength > 0.5) {
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const ang = (i / n) * Math.PI * 2 + t * 0.5;
+      const rr = 0.25 + 0.15 * Math.sin(t * 2 + i);
+      const x = Math.cos(ang) * rr;
+      const z = Math.sin(ang) * rr;
+      const p1 = project(x, pA.y0 + 0.4, z);
+      const p2 = project(x, pB.y0 - 0.4, z);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.strokeStyle = same
+        ? `rgba(140,190,255,${0.08 + 0.15 * strength})`
+        : `rgba(255,170,120,${0.1 + 0.18 * strength})`;
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+  }
+}
+
+function drawStackRays(dynAvg) {
+  // faint collective rays along stack axis
+  const n = 24;
+  for (let i = 0; i < n; i++) {
+    const ang = (i / n) * Math.PI * 2;
+    const rr = 0.15 + 0.1 * (i % 3);
+    const x = Math.cos(ang) * rr;
+    const z = Math.sin(ang) * rr;
+    const y0 = particles[0].y0 - 0.6;
+    const y1 = particles[NPART - 1].y0 + 0.6;
+    const p1 = project(x, y0, z);
+    const p2 = project(x, y1, z);
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.strokeStyle = `rgba(150,180,255,${0.04 + 0.06 * dynAvg})`;
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+  }
+}
+
+let last = performance.now();
+let flipCount = 0;
+let lastSigns = particles.map(p => p.sign);
+
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (!paused) {
+    t += dt;
+    const dyns = particles.map(p => dynOf(p, t));
+
+    // update with neighbour coupling
+    for (let i = 0; i < NPART; i++) {
+      const neighbors = [];
+      if (i > 0) neighbors.push(particles[i - 1]);
+      if (i < NPART - 1) neighbors.push(particles[i + 1]);
+      updateParticle(particles[i], dyns[i], dt, neighbors);
+    }
+
+    // count flips
+    for (let i = 0; i < NPART; i++) {
+      if (particles[i].sign !== lastSigns[i]) flipCount++;
+      lastSigns[i] = particles[i].sign;
+    }
+
+    const avgStress = dyns.reduce((s, d) => s + d.stressMag, 0) / NPART;
+    const nOpp = particles.filter((p, i) => i > 0 && p.sign !== particles[i-1].sign).length;
+
+    document.getElementById('stack-stress').textContent = avgStress.toFixed(3);
+    document.getElementById('stack-bar').style.width = (avgStress * 100) + '%';
+    document.getElementById('stack-bar').style.background = avgStress > 0.7 ? '#ffb060' : '#6a9fff';
+    document.getElementById('coupling').textContent = nOpp > 0 ? `${nOpp} opposing interface(s)` : 'aligned';
+    document.getElementById('flips').textContent = String(flipCount);
+    const modesDiv = document.getElementById('modes');
+    modesDiv.innerHTML = dyns.map((d, i) =>
+      `<span class="mode" style="background:${d.bg};color:${d.col}">${i+1} ${d.mode}</span>`
+    ).join('');
+
+    ctx.fillStyle = '#07070f';
+    ctx.fillRect(0, 0, W, H);
+    const bg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.5);
+    bg.addColorStop(0, 'rgba(14,16,30,0.5)');
+    bg.addColorStop(1, 'rgba(7,7,15,0)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    drawStackRays(avgStress);
+
+    // draw back to front by particle y after rotation — approximate by id order with rotX
+    const order = particles.map((p, i) => ({ p, d: dyns[i], i }))
+      .sort((a, b) => {
+        const za = project(0, a.p.y0, 0).z;
+        const zb = project(0, b.p.y0, 0).z;
+        return za - zb;
+      });
+
+    // couplings first (between)
+    for (let i = 0; i < NPART - 1; i++) {
+      drawCoupling(particles[i], dyns[i], particles[i+1], dyns[i+1]);
+    }
+    for (const { p, d } of order) {
+      drawParticle(p, d);
+    }
+
+    ctx.font = '11px system-ui';
+    ctx.fillStyle = '#4a5568';
+    ctx.fillText('stacked non-ideal cells · solvent boundaries · sympathetic coupling', 16, H - 36);
+    ctx.fillText('alternating residual · phase pull near caustic · Pℓ ↔ pℓ', 16, H - 20);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The Unified Relational Framework — foundational geometry, research documents, and interactive simulations.">
+  <title>The Unified Relational Framework</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #eef3f7;
+      --muted: #a9b4bd;
+      --line: #2c3942;
+      --panel: #111a20;
+      --accent: #e9b44c;
+      --blue: #72c8e8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #091015;
+      color: var(--ink);
+      font: 17px/1.65 Georgia, "Times New Roman", serif;
+    }
+    main { width: min(1040px, calc(100% - 36px)); margin: auto; padding: 72px 0; }
+    header { max-width: 850px; margin-bottom: 54px; }
+    .eyebrow { color: var(--accent); font: 700 .78rem/1.2 system-ui, sans-serif; letter-spacing: .15em; text-transform: uppercase; }
+    h1 { font-size: clamp(2.6rem, 7vw, 5.4rem); line-height: .98; margin: 14px 0 24px; letter-spacing: -.045em; }
+    h2 { font-size: 1.75rem; margin: 0 0 12px; }
+    h3 { font-size: 1.08rem; margin: 0 0 8px; }
+    p { color: var(--muted); margin: 0 0 18px; }
+    a { color: var(--blue); }
+    .lead { font-size: 1.18rem; max-width: 760px; }
+    .paper {
+      padding: 32px;
+      border: 1px solid #80672f;
+      background: linear-gradient(135deg, #1b1d19, var(--panel));
+      border-radius: 12px;
+      margin-bottom: 48px;
+    }
+    .paper .status { color: var(--accent); font: 700 .78rem/1.2 system-ui, sans-serif; text-transform: uppercase; letter-spacing: .1em; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+    .button {
+      display: inline-block;
+      padding: 10px 15px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: var(--ink);
+      text-decoration: none;
+      font-family: system-ui, sans-serif;
+      font-size: .9rem;
+    }
+    .button.primary { background: var(--accent); border-color: var(--accent); color: #15120a; font-weight: 700; }
+    section { margin-top: 48px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 14px; }
+    .card {
+      display: block;
+      min-height: 150px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .card:hover { border-color: var(--blue); transform: translateY(-1px); }
+    .card p { font-size: .92rem; margin: 0; }
+    .documents { columns: 2 300px; padding-left: 20px; }
+    .documents li { break-inside: avoid; margin: 0 0 10px; padding-right: 18px; }
+    .note { border-left: 3px solid var(--accent); padding: 4px 0 4px 18px; margin-top: 28px; }
+    footer { color: var(--muted); border-top: 1px solid var(--line); margin-top: 64px; padding-top: 24px; font: .9rem/1.5 system-ui, sans-serif; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Independent geometry research</div>
+      <h1>The Unified Relational Framework</h1>
+      <p class="lead">A research programme investigating the complete Reuleaux generating arrangement, its exact six-point incidence geometry, and explicitly identified higher-dimensional continuations.</p>
+      <p class="note">This archive distinguishes established geometry from construction principles, conjectures, and physical hypotheses.</p>
+    </header>
+
+    <article class="paper">
+      <div class="status">Paper I · Current foundation</div>
+      <h2>The Complete Reuleaux Generating Arrangement</h2>
+      <p>Foundational geometry and introduction to the parent construction. The paper derives the six-point incidence structure and exact 2:1 centroidal ratio, then states the tetrahedral extension as a conditional construction principle.</p>
+      <div class="actions">
+        <a class="button primary" href="papers/URF_Paper_I_Foundational_Geometry.pdf">Read PDF</a>
+        <a class="button" href="papers/URF_Paper_I_Foundational_Geometry.docx">Editable manuscript</a>
+      </div>
+    </article>
+
+    <section>
+      <div class="eyebrow">Interactive work</div>
+      <h2>Simulations</h2>
+      <div class="grid">
+        <a class="card" href="simulations/four_body_assembly.html"><h3>Four-Body Assembly</h3><p>Explore the tetrahedral four-body arrangement.</p></a>
+        <a class="card" href="simulations/raytrace_webgl.html"><h3>WebGL Ray March</h3><p>Interactive optical-mode ray marching.</p></a>
+        <a class="card" href="simulations/raytrace_shortfall.html"><h3>Ray Trace v2</h3><p>Alternative optical-mode experiment.</p></a>
+        <a class="card" href="simulations/stack_residual_coupling.html"><h3>Residual Coupling</h3><p>Stacked-particle residual interaction model.</p></a>
+        <a class="card" href="simulations/intrinsic_relational_engine.html"><h3>Relational Engine</h3><p>Intrinsic relational construction experiment.</p></a>
+        <a class="card" href="simulations/full_stack.html"><h3>Full Stack</h3><p>Combined exploratory URF model.</p></a>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">Research archive</div>
+      <h2>Documents</h2>
+      <ul class="documents">
+        <li><a href="documents/URF_Geometry_Boundary_Conditions_and_Transition_Mechanisms.pdf">Geometry, Boundary Conditions, and Transition Mechanisms</a></li>
+        <li><a href="documents/Three_Mode_Substrate_Geometry_Topology_and_Intrinsic_Frame.pdf">Three-Mode Geometry, Topology, and Intrinsic Frame</a></li>
+        <li><a href="documents/Three_Mode_Substrate_Writeup.pdf">Three-Mode Substrate Write-up</a></li>
+        <li><a href="documents/URF_Current_Working_State.pdf">Current Working State</a></li>
+        <li><a href="documents/URF_Data.pdf">URF Data</a></li>
+        <li><a href="documents/Natural_Physics.pdf">Natural Physics</a></li>
+        <li><a href="documents/Time_Space_and_the_Speed_of_Light_v2.2.pdf">Time, Space, and the Speed of Light v2.2</a></li>
+        <li><a href="documents/c_as_Invariant_Boundary_Condition.pdf"><i>c</i> as the Invariant Boundary Condition</a></li>
+        <li><a href="documents/URF_Journal_Submission_0.1_Archive.pdf">Earlier Journal Submission 0.1 (archive)</a></li>
+      </ul>
+    </section>
+
+    <footer>Chris Peterson · Independent Researcher · Unified Relational Framework</footer>
+  </main>
+</body>
+</html>

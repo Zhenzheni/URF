@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>URF · WebGL Ray March · Optical Modes</title>
+<style>
+  :root {
+    --bg: #04040a;
+    --panel: rgba(6,8,18,0.94);
+    --line: #2a3555;
+    --ink: #e8ecf4;
+    --muted: #7a8498;
+    --accent: #9eb6ff;
+    --amber: #ffc84a;
+    --teal: #3f93ab;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #ui {
+    position: absolute; top: 10px; left: 10px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px; width: 292px;
+    max-height: 94vh; overflow-y: auto; font-size: 12px;
+    backdrop-filter: blur(8px);
+  }
+  h1 { font-size: 11px; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+  .sub { font-size: 10px; color: var(--muted); margin-bottom: 8px; line-height: 1.35; }
+  .row { display: flex; justify-content: space-between; margin: 3px 0; }
+  .label { color: var(--muted); }
+  .val { font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 500; }
+  label.ctrl { display: block; color: #8a93a8; margin-top: 8px; font-size: 11px; }
+  input[type=range] { width: 100%; margin: 2px 0; accent-color: var(--accent); }
+  button {
+    margin-top: 6px; width: 100%; padding: 7px;
+    background: #1a2440; border: 1px solid #3a4a70; color: #c8d0e8;
+    border-radius: 6px; cursor: pointer; font-size: 11px;
+  }
+  button:hover { background: #243056; }
+  button.on { border-color: var(--amber); color: var(--amber); }
+  .arrow-row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+  .arrow-row button { width: 36px; margin-top: 0; padding: 6px 0; font-size: 14px; font-weight: 700; }
+  .arrow-row .kfine { flex: 1; text-align: center; font-variant-numeric: tabular-nums; color: var(--ink); font-size: 13px; }
+  .mode-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 4px 0; padding: 4px 6px; border-radius: 6px;
+  }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; flex-shrink: 0; }
+  .mode-name { flex: 1; font-size: 11px; font-weight: 600; }
+  .mode-count { font-variant-numeric: tabular-nums; font-size: 11px; }
+  #metrics {
+    margin-top: 10px; border-top: 1px solid #1e2840; padding-top: 8px;
+    font-size: 10px; color: #8a93a8; max-height: 120px; overflow-y: auto;
+    font-family: ui-monospace, monospace; line-height: 1.45;
+  }
+  #metrics .mh { color: var(--accent); font-weight: 600; margin-bottom: 4px; }
+  #metrics .rowm { display: flex; justify-content: space-between; gap: 8px; }
+  #metrics .pct { color: #c8d0e8; }
+  #hint {
+    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: #556070; pointer-events: none; white-space: nowrap;
+  }
+  #fps {
+    position: absolute; top: 10px; right: 14px;
+    font-size: 11px; color: #556070; font-family: ui-monospace, monospace;
+  }
+  .sec {
+    margin-top: 10px; border-top: 1px solid #1e2840; padding-top: 8px;
+    font-size: 10px; color: #8a93a8; letter-spacing: 0.08em; text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="fps">— fps</div>
+<div id="ui">
+  <h1>URF WebGL Ray March</h1>
+  <div class="sub">SDF sphere-tracing · residual bend · optical modes<br/>GPU per-pixel · same κ / set / emit model</div>
+
+  <div class="row"><span class="label">κ (shortfall)</span><span class="val" id="kappav">1.20</span></div>
+  <div class="row"><span class="label">Sets active</span><span class="val" id="setcount">1</span></div>
+  <div class="row"><span class="label">Spheres</span><span class="val" id="nspheres">60</span></div>
+
+  <div style="margin-top:10px;border-top:1px solid #1e2840;padding-top:8px">
+    <div class="mode-row" style="background:#1a1a22">
+      <div class="swatch" style="background:#ffffff"></div>
+      <span class="mode-name" style="color:#ffffff">CRYPTIC</span>
+      <span class="mode-count" id="cCRYPTIC" style="color:#ffffff">—</span>
+    </div>
+    <div class="mode-row" style="background:#2a2010">
+      <div class="swatch" style="background:#ffc84a"></div>
+      <span class="mode-name" style="color:#ffc84a">CAUSTIC</span>
+      <span class="mode-count" id="cCAUSTIC" style="color:#ffc84a">—</span>
+    </div>
+    <div class="mode-row" style="background:#221830">
+      <div class="swatch" style="background:#d080ff"></div>
+      <span class="mode-name" style="color:#d080ff">PRISMATIC</span>
+      <span class="mode-count" id="cPRISMATIC" style="color:#d080ff">—</span>
+    </div>
+    <div class="mode-row" style="background:#102818">
+      <div class="swatch" style="background:#3a9a68"></div>
+      <span class="mode-name" style="color:#3a9a68">KINETIC</span>
+      <span class="mode-count" id="cKINETIC" style="color:#3a9a68">—</span>
+    </div>
+    <div class="mode-row" style="background:#101820">
+      <div class="swatch" style="background:#3a5870"></div>
+      <span class="mode-name" style="color:#3a5870">SCOTOPIC</span>
+      <span class="mode-count" id="cSCOTOPIC" style="color:#3a5870">—</span>
+    </div>
+  </div>
+
+  <label class="ctrl">Shortfall strength κ
+    <input type="range" id="kappa" min="-300" max="300" value="120" step="1"/>
+  </label>
+  <div class="arrow-row">
+    <button type="button" id="kdown" title="κ −0.01">−</button>
+    <div class="kfine" id="kfine">1.20</div>
+    <button type="button" id="kup" title="κ +0.01">+</button>
+  </div>
+  <div class="arrow-row" style="margin-top:2px">
+    <button type="button" id="kdown10" title="κ −0.10">−−</button>
+    <div class="kfine" style="font-size:10px;color:#7a8498">fine / coarse</div>
+    <button type="button" id="kup10" title="κ +0.10">++</button>
+  </div>
+
+  <label class="ctrl">Quality (march steps)
+    <input type="range" id="quality" min="24" max="96" value="56" step="8"/>
+  </label>
+  <label class="ctrl">Show structure
+    <input type="range" id="struct" min="0" max="1" value="1" step="1"/>
+  </label>
+  <label class="ctrl">Packed background density
+    <input type="range" id="packdens" min="1" max="15" value="1" step="1"/>
+  </label>
+
+  <div class="sec">Sets</div>
+  <div class="arrow-row">
+    <button type="button" id="setminus">− set</button>
+    <div class="kfine" id="setlab">1 set</div>
+    <button type="button" id="setplus">+ set</button>
+  </div>
+  <div class="row" style="margin-top:4px"><span class="label">Self-nuclearisation</span><span class="val" id="natv">ON</span></div>
+  <div style="font-size:9px;color:#6a7388;margin:2px 0 4px;line-height:1.35">
+    κ&lt;0 compress → explosive · κ&gt;0 expand → sympathetic<br/>
+    triggers at PL–pl limits (±1, ±2.5)
+  </div>
+  <button id="natnuc">Toggle self-nuclearisation</button>
+
+  <div class="sec">κ sweep</div>
+  <button id="sweep">κ sweep −3 → +3 → −3</button>
+  <button id="cycle12">Demo: 12-phase (uses sweep)</button>
+
+  <div class="sec">Emission &amp; field</div>
+  <button id="emit">Internal emit (self-light)</button>
+  <button id="breathe" class="on">Breathing ON</button>
+  <button id="pause">Pause / Resume</button>
+  <button id="reset">Reset view</button>
+  <button id="capture">Capture mode sample</button>
+  <button id="exportcsv">Export metrics CSV</button>
+  <div id="metrics"><div class="mh">Metrics log</div><div id="mbody">— sample screen modes vs κ</div></div>
+</div>
+<div id="hint">Drag rotate · Scroll zoom · Shift-pan · WebGL SDF · Cryptic brightest · residual bend ∝ κ</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   URF WebGL Ray March — SDF pressure-shell tracer
+   Geometry: tetrahedral 4-sphere sets, packed lattice background
+   Residual: κ-driven radial breathe + ray bend along membrane normals
+   Modes: Cryptic / Caustic / Prismatic / Kinetic / Scotopic
+   ═══════════════════════════════════════════════════════════════ */
+
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+if (!gl) {
+  document.body.innerHTML = '<p style="color:#fff;padding:2rem">WebGL2 required.</p>';
+  throw new Error('WebGL2 unavailable');
+}
+
+/* ─── Geometry: regular tetrahedron template ─── */
+const INV_SQRT3 = 1 / Math.sqrt(3);
+const TET_TEMPLATE = [
+  [ 1,  1,  1],
+  [ 1, -1, -1],
+  [-1,  1, -1],
+  [-1, -1,  1]
+].map(([x,y,z]) => {
+  const L = Math.hypot(x,y,z);
+  return [x/L * 0.55, y/L * 0.55, z/L * 0.55];
+});
+// centre at origin
+(() => {
+  let cx=0,cy=0,cz=0;
+  for (const c of TET_TEMPLATE) { cx+=c[0]; cy+=c[1]; cz+=c[2]; }
+  cx/=4; cy/=4; cz/=4;
+  for (const c of TET_TEMPLATE) { c[0]-=cx; c[1]-=cy; c[2]-=cz; }
+})();
+
+const SET_SPACING = 1.0;
+const SPH_R0 = 0.28;
+const MAX_SPHERES = 64; // GPU uniform budget
+
+function makeSetAt(ox, oy, oz, phase) {
+  const ca = Math.cos(phase), sa = Math.sin(phase);
+  return TET_TEMPLATE.map(([x,y,z]) => {
+    // light residual twist about Y
+    const xr = x*ca + z*sa;
+    const zr = -x*sa + z*ca;
+    return [ox + xr, oy + y, oz + zr];
+  });
+}
+
+function buildPackedBackground(nKeep) {
+  const offsets = [
+    [0,0,0],
+    [1,1,1],[1,1,-1],[1,-1,1],[1,-1,-1],
+    [-1,1,1],[-1,1,-1],[-1,-1,1],[-1,-1,-1],
+    [2,0,0],[-2,0,0],[0,2,0],[0,-2,0],[0,0,2],[0,0,-2]
+  ];
+  const s = SET_SPACING * 0.72;
+  const sets = [];
+  for (let i = 0; i < Math.min(nKeep, offsets.length); i++) {
+    const [a,b,c] = offsets[i];
+    sets.push(makeSetAt(a*s, b*s, c*s, i * 0.37));
+  }
+  return sets;
+}
+
+/* ─── State ─── */
+let kappaScale = 1.20;
+let splitLevel = 0;          // extra nuclearised sets
+let packDens = 1;            // start with origin set only — zoom out / raise density for lattice
+let PACKED = buildPackedBackground(packDens);
+let BASE = PACKED[0].map(c => c.slice());
+let BASE_SECOND = null, BASE_THIRD = null;
+let extraSets = [];
+let naturalNucleation = true;
+let emitMode = false;
+let breathing = true;
+let breathPhase = 0;
+let residualSign = 1;
+let showStruct = 1;
+let quality = 56;
+let paused = false;
+let prevK = kappaScale;
+
+let rotY = 0.55, rotX = 0.28, zoom = 9.0, panX = 0, panY = 0;
+let dragging = false, panning = false, lx = 0, ly = 0;
+
+let SHELL_AXIS = [0, 1, 0];
+function recomputeShellAxis() {
+  let ax=0, ay=0, az=0, best=-1;
+  for (const c of BASE) {
+    const r2 = c[0]*c[0]+c[1]*c[1]+c[2]*c[2];
+    if (r2 > best) { best = r2; ax=c[0]; ay=c[1]; az=c[2]; }
+  }
+  let L = Math.hypot(ax,ay,az)||1;
+  ax/=L; ay/=L; az/=L;
+  for (let it=0; it<12; it++) {
+    let nx=0,ny=0,nz=0;
+    for (const c of BASE) {
+      const d = c[0]*ax+c[1]*ay+c[2]*az;
+      nx+=c[0]*d; ny+=c[1]*d; nz+=c[2]*d;
+    }
+    L = Math.hypot(nx,ny,nz)||1;
+    ax=nx/L; ay=ny/L; az=nz/L;
+  }
+  SHELL_AXIS = [ax, ay, az];
+}
+recomputeShellAxis();
+
+function allCentres() {
+  let C = [];
+  for (const set of PACKED) for (const c of set) C.push(c);
+  if (splitLevel >= 1 && BASE_SECOND) C = C.concat(BASE_SECOND);
+  if (splitLevel >= 2 && BASE_THIRD) C = C.concat(BASE_THIRD);
+  for (const s of extraSets) C = C.concat(s);
+  return C;
+}
+
+function breathScale() {
+  if (!breathing) return { rad: 1, radial: 1 };
+  const amp = Math.min(0.28, 0.06 + 0.08 * Math.abs(kappaScale));
+  const s = Math.sign(kappaScale) || residualSign;
+  const radial = 1 + s * amp;
+  const rad = 1 + 0.03 * Math.sin(breathPhase * Math.PI / 6);
+  return { rad, radial };
+}
+
+function deformedCentres() {
+  const C = allCentres();
+  if (!C.length) return C;
+  let cx=0,cy=0,cz=0;
+  for (const c of C) { cx+=c[0]; cy+=c[1]; cz+=c[2]; }
+  cx/=C.length; cy/=C.length; cz/=C.length;
+  const b = breathScale();
+  return C.map(c => [
+    cx + (c[0]-cx) * b.radial * b.rad,
+    cy + (c[1]-cy) * b.radial * b.rad,
+    cz + (c[2]-cz) * b.radial * b.rad
+  ]);
+}
+
+function makeShiftedSet(source, axis, shift) {
+  let best=-1e9, idx=0;
+  for (let i=0;i<source.length;i++) {
+    const c=source[i];
+    const proj=c[0]*axis[0]+c[1]*axis[1]+c[2]*axis[2];
+    if (proj>best){best=proj;idx=i;}
+  }
+  const peel=source[idx];
+  return source.map(c => [
+    c[0]-peel[0]+axis[0]*shift+peel[0]*0.15,
+    c[1]-peel[1]+axis[1]*shift+peel[1]*0.15,
+    c[2]-peel[2]+axis[2]*shift+peel[2]*0.15
+  ]);
+}
+
+function addOneSet() {
+  if (splitLevel >= 8) return;
+  if (splitLevel === 0) {
+    BASE_SECOND = makeShiftedSet(BASE, SHELL_AXIS, 1.15);
+    splitLevel = 1;
+  } else if (splitLevel === 1) {
+    const ax = SHELL_AXIS;
+    let px=BASE[1][0]-BASE[0][0], py=BASE[1][1]-BASE[0][1], pz=BASE[1][2]-BASE[0][2];
+    const par=px*ax[0]+py*ax[1]+pz*ax[2];
+    px-=par*ax[0]; py-=par*ax[1]; pz-=par*ax[2];
+    const L=Math.hypot(px,py,pz)||1;
+    BASE_THIRD = makeShiftedSet(BASE_SECOND||BASE, [px/L,py/L,pz/L], 1.15);
+    splitLevel = 2;
+  } else {
+    const ang = splitLevel * 2.399;
+    const axis = [
+      Math.cos(ang)*SHELL_AXIS[0]+Math.sin(ang)*0.7,
+      SHELL_AXIS[1]*0.3+Math.cos(ang*1.3)*0.7,
+      Math.sin(ang)*SHELL_AXIS[2]+Math.cos(ang)*0.5
+    ];
+    const L=Math.hypot(axis[0],axis[1],axis[2])||1;
+    const seed = BASE_THIRD || BASE_SECOND || BASE;
+    extraSets.push(makeShiftedSet(seed, [axis[0]/L,axis[1]/L,axis[2]/L], 1.15+0.05*splitLevel));
+    splitLevel++;
+  }
+  updateSetLabel();
+}
+
+function removeOneSet() {
+  if (splitLevel <= 0) return;
+  if (extraSets.length) { extraSets.pop(); splitLevel--; }
+  else if (splitLevel >= 2) { BASE_THIRD=null; splitLevel=1; }
+  else { BASE_SECOND=null; BASE_THIRD=null; splitLevel=0; }
+  updateSetLabel();
+}
+
+function maybeNaturalNucleate(prevK, nextK) {
+  if (!naturalNucleation || splitLevel >= 8) return;
+  const crossed = L => (prevK - L) * (nextK - L) <= 0 && prevK !== nextK;
+  let mode = null;
+  if (crossed(-1.0) || crossed(-2.5)) mode = 'explosive';
+  else if (crossed(1.0) || crossed(2.5)) mode = 'sympathetic';
+  if (!mode) return;
+  residualSign = mode === 'explosive' ? -1 : 1;
+  const shift = mode === 'explosive' ? 1.35 : 1.10;
+  if (splitLevel === 0) {
+    if (mode === 'explosive') BASE_SECOND = makeShiftedSet(BASE, SHELL_AXIS, shift);
+    else {
+      const ax=SHELL_AXIS;
+      let px=BASE[1][0]-BASE[0][0], py=BASE[1][1]-BASE[0][1], pz=BASE[1][2]-BASE[0][2];
+      const par=px*ax[0]+py*ax[1]+pz*ax[2];
+      px-=par*ax[0]; py-=par*ax[1]; pz-=par*ax[2];
+      const L=Math.hypot(px,py,pz)||1;
+      BASE_SECOND = makeShiftedSet(BASE, [px/L,py/L,pz/L], shift);
+    }
+    splitLevel = 1;
+  } else addOneSet();
+  updateSetLabel();
+  captureMetrics(mode === 'explosive' ? 'EXPL' : 'SYMP');
+}
+
+function updateSetLabel() {
+  const n = 1 + splitLevel;
+  document.getElementById('setcount').textContent = String(n);
+  document.getElementById('setlab').textContent = n + (n===1?' set':' sets');
+}
+
+/* ─── WebGL shaders ─── */
+const VS = `#version 300 es
+precision highp float;
+const vec2 POS[3] = vec2[3](vec2(-1.0,-1.0), vec2(3.0,-1.0), vec2(-1.0,3.0));
+out vec2 vUv;
+void main() {
+  vec2 p = POS[gl_VertexID];
+  vUv = p * 0.5 + 0.5;
+  gl_Position = vec4(p, 0.0, 1.0);
+}`;
+
+const FS = `#version 300 es
+precision highp float;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform vec2  uRes;
+uniform float uTime;
+uniform float uKappa;
+uniform float uZoom;
+uniform float uRotX;
+uniform float uRotY;
+uniform vec2  uPan;
+uniform int   uSteps;
+uniform int   uNSpheres;
+uniform int   uShowStruct;
+uniform int   uEmit;
+uniform float uSphR;
+uniform vec3  uShellAxis;
+uniform vec3  uCentres[64];
+
+float sdSphere(vec3 p, vec3 c, float r) {
+  return length(p - c) - r;
+}
+
+// Soft min for membrane blending between overlapping spheres
+float smin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+float mapScene(vec3 p) {
+  float d = 1e5;
+  float kBlend = 0.08 + 0.04 * abs(uKappa);
+  for (int i = 0; i < 64; i++) {
+    if (i >= uNSpheres) break;
+    float di = sdSphere(p, uCentres[i], uSphR);
+    d = smin(d, di, kBlend);
+  }
+  return d;
+}
+
+// Residual pressure field magnitude near membranes (thin shell glow)
+float membraneField(vec3 p) {
+  float d = mapScene(p);
+  // peak near surface |d|~0, fall off inside/outside
+  return exp(-d * d * 18.0);
+}
+
+vec3 calcNormal(vec3 p) {
+  const float e = 0.0015;
+  return normalize(vec3(
+    mapScene(p + vec3(e,0,0)) - mapScene(p - vec3(e,0,0)),
+    mapScene(p + vec3(0,e,0)) - mapScene(p - vec3(0,e,0)),
+    mapScene(p + vec3(0,0,e)) - mapScene(p - vec3(0,0,e))
+  ));
+}
+
+// Residual bend: gradient of membrane field pushes rays (κ-weighted)
+vec3 residualGrad(vec3 p) {
+  const float e = 0.02;
+  float gx = membraneField(p+vec3(e,0,0)) - membraneField(p-vec3(e,0,0));
+  float gy = membraneField(p+vec3(0,e,0)) - membraneField(p-vec3(0,e,0));
+  float gz = membraneField(p+vec3(0,0,e)) - membraneField(p-vec3(0,0,e));
+  return vec3(gx, gy, gz) / (2.0 * e);
+}
+
+mat3 camMatrix(vec3 ro, vec3 ta) {
+  vec3 f = normalize(ta - ro);
+  vec3 r = normalize(cross(f, vec3(0.0, 1.0, 0.0)));
+  vec3 u = cross(r, f);
+  return mat3(r, u, f);
+}
+
+// Mode IDs: 0 Cryptic, 1 Caustic, 2 Prismatic, 3 Kinetic, 4 Scotopic
+int classify(float totalTurn, float maxSf, float memFrac, float meanAlign, float intensity) {
+  float avgTurn = totalTurn;
+  if (maxSf > 0.85 && avgTurn > 0.07 && intensity > 0.25) return 1; // CAUSTIC
+  if (avgTurn > 0.055 && memFrac > 0.18 && intensity > 0.2) return 2; // PRISMATIC
+  if (memFrac > 0.35 && avgTurn < 0.04 && meanAlign < 0.55) return 0; // CRYPTIC
+  if (memFrac > 0.40 && intensity < 0.5 && avgTurn < 0.10) return 4; // SCOTOPIC
+  return 3; // KINETIC
+}
+
+vec3 modeColor(int m) {
+  if (m == 0) return vec3(1.00, 1.00, 1.00); // Cryptic brightest
+  if (m == 1) return vec3(1.00, 0.78, 0.29); // Caustic
+  if (m == 2) return vec3(0.82, 0.50, 1.00); // Prismatic
+  if (m == 3) return vec3(0.23, 0.60, 0.41); // Kinetic
+  return vec3(0.23, 0.35, 0.44);             // Scotopic
+}
+
+void main() {
+  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+  uv -= uPan * 0.001;
+
+  // Orbit camera
+  float cy = cos(uRotY), sy = sin(uRotY);
+  float cx = cos(uRotX), sx = sin(uRotX);
+  vec3 ta = vec3(0.0);
+  vec3 ro = vec3(sy * cx, sx, cy * cx) * uZoom;
+
+  // Internal emit: camera near centroid looking out
+  if (uEmit == 1) {
+    ro = vec3(0.05 * sin(uTime), 0.02, 0.05 * cos(uTime));
+    ta = normalize(vec3(uv.x, uv.y, 1.0));
+    // build ray from inside
+    vec3 rd = normalize(ta);
+    // rotate by orbit for inspectability
+    rd = vec3(rd.x*cy + rd.z*sy, rd.y, -rd.x*sy + rd.z*cy);
+    rd = normalize(rd);
+
+    float t = 0.0;
+    float totalTurn = 0.0;
+    float maxSf = 0.0;
+    float memAcc = 0.0;
+    float alignAcc = 0.0;
+    int steps = 0;
+    vec3 prevRd = rd;
+    float intensity = 1.0;
+
+    for (int i = 0; i < 96; i++) {
+      if (i >= uSteps) break;
+      vec3 p = ro + rd * t;
+      float d = mapScene(p);
+      float mf = membraneField(p);
+      memAcc += mf;
+      float sf = abs(d) < 0.15 ? (1.0 - abs(d) / 0.15) : 0.0;
+      maxSf = max(maxSf, sf * abs(uKappa) * 0.35);
+
+      // residual bend
+      vec3 g = residualGrad(p);
+      float bend = 0.015 * uKappa;
+      vec3 nrd = normalize(rd + g * bend);
+      totalTurn += acos(clamp(dot(prevRd, nrd), -1.0, 1.0));
+      prevRd = nrd;
+      rd = nrd;
+      alignAcc += abs(dot(rd, uShellAxis));
+
+      if (d < 0.002) {
+        // surface hit from inside — refract-ish continue with loss
+        intensity *= 0.72;
+        t += 0.05;
+        steps++;
+        if (intensity < 0.05) break;
+        continue;
+      }
+      t += clamp(d, 0.01, 0.35);
+      steps++;
+      if (t > 12.0) break;
+    }
+
+    float meanAlign = alignAcc / max(float(steps), 1.0);
+    float memFrac = memAcc / max(float(steps), 1.0);
+    int mode = classify(totalTurn, maxSf, memFrac, meanAlign, intensity);
+    vec3 col = modeColor(mode) * (0.35 + 0.65 * intensity);
+
+    // gold shortfall loci
+    float loci = maxSf * maxSf;
+    col = mix(col, vec3(1.0, 0.85, 0.35), loci * 0.55);
+
+    // vignette
+    float vig = smoothstep(1.4, 0.2, length(uv));
+    col *= vig;
+    fragColor = vec4(col, 1.0);
+    return;
+  }
+
+  mat3 ca = camMatrix(ro, ta);
+  vec3 rd = normalize(ca * vec3(uv, 2.4));
+
+  float t = 0.0;
+  float totalTurn = 0.0;
+  float maxSf = 0.0;
+  float memAcc = 0.0;
+  float alignAcc = 0.0;
+  int steps = 0;
+  vec3 prevRd = rd;
+  float intensity = 1.0;
+  bool hit = false;
+  vec3 hitP = ro;
+  vec3 hitN = vec3(0.0,1.0,0.0);
+
+  for (int i = 0; i < 96; i++) {
+    if (i >= uSteps) break;
+    vec3 p = ro + rd * t;
+    float d = mapScene(p);
+    float mf = membraneField(p);
+    memAcc += mf;
+
+    // shortfall concentration near membrane under κ
+    float sf = mf * (0.4 + 0.6 * abs(uKappa) / 3.0);
+    maxSf = max(maxSf, sf);
+
+    // residual bend of the ray (geometry-led transport)
+    vec3 g = residualGrad(p);
+    float bendStr = 0.012 * uKappa * (0.3 + 0.7 * mf);
+    vec3 nrd = normalize(rd + g * bendStr);
+    float turn = acos(clamp(dot(prevRd, nrd), -1.0, 1.0));
+    totalTurn += turn;
+    prevRd = nrd;
+    rd = nrd;
+    alignAcc += abs(dot(rd, uShellAxis));
+    intensity *= (1.0 - 0.008 * abs(uKappa) * mf);
+
+    if (d < 0.002) {
+      hit = true;
+      hitP = p;
+      hitN = calcNormal(p);
+      break;
+    }
+    t += clamp(abs(d), 0.008, 0.4);
+    steps++;
+    if (t > 24.0) break;
+  }
+
+  float meanAlign = alignAcc / max(float(steps), 1.0);
+  float memFrac = memAcc / max(float(steps), 1.0);
+  int mode = classify(totalTurn, maxSf, memFrac, meanAlign, intensity);
+  vec3 col = vec3(0.02, 0.025, 0.04); // void / packed dark
+
+  if (hit && uShowStruct == 1) {
+    // structure shading
+    vec3 light = normalize(vec3(0.4, 0.7, 0.35));
+    float dif = clamp(dot(hitN, light), 0.0, 1.0);
+    float fre = pow(1.0 - clamp(dot(hitN, -rd), 0.0, 1.0), 2.2);
+    // AO from SDF
+    float ao = clamp(mapScene(hitP + hitN * 0.08) / 0.08, 0.25, 1.0);
+
+    vec3 base = modeColor(mode);
+    col = base * (0.18 + 0.82 * dif) * ao;
+    col += base * fre * 0.35;
+    col *= (0.45 + 0.55 * intensity);
+
+    // membrane edge highlight under κ
+    col += vec3(0.9, 0.75, 0.4) * maxSf * 0.4;
+  } else if (!hit) {
+    // miss: residual fog / mode-tinted empty corridors
+    float fog = memFrac * 0.85;
+    col = mix(col, modeColor(mode) * 0.55, fog * intensity);
+    col += vec3(0.9, 0.8, 0.4) * maxSf * 0.25;
+  }
+
+  // soft background gradient
+  col += vec3(0.01, 0.015, 0.03) * (1.0 - smoothstep(0.0, 1.2, length(uv)));
+
+  // tone
+  col = col / (1.0 + col * 0.35);
+  col = pow(col, vec3(0.92));
+
+  fragColor = vec4(col, 1.0);
+}`;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(s));
+    throw new Error('shader compile failed');
+  }
+  return s;
+}
+
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+  console.error(gl.getProgramInfoLog(prog));
+  throw new Error('program link failed');
+}
+gl.useProgram(prog);
+
+const u = {
+  res: gl.getUniformLocation(prog, 'uRes'),
+  time: gl.getUniformLocation(prog, 'uTime'),
+  kappa: gl.getUniformLocation(prog, 'uKappa'),
+  zoom: gl.getUniformLocation(prog, 'uZoom'),
+  rotX: gl.getUniformLocation(prog, 'uRotX'),
+  rotY: gl.getUniformLocation(prog, 'uRotY'),
+  pan: gl.getUniformLocation(prog, 'uPan'),
+  steps: gl.getUniformLocation(prog, 'uSteps'),
+  nSph: gl.getUniformLocation(prog, 'uNSpheres'),
+  show: gl.getUniformLocation(prog, 'uShowStruct'),
+  emit: gl.getUniformLocation(prog, 'uEmit'),
+  sphR: gl.getUniformLocation(prog, 'uSphR'),
+  axis: gl.getUniformLocation(prog, 'uShellAxis'),
+  centres: []
+};
+for (let i = 0; i < MAX_SPHERES; i++) {
+  u.centres.push(gl.getUniformLocation(prog, `uCentres[${i}]`));
+}
+
+/* ─── Resize ─── */
+let W = 0, H = 0;
+function resize() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  canvas.width = Math.floor(W * dpr);
+  canvas.height = Math.floor(H * dpr);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+addEventListener('resize', resize);
+resize();
+
+/* ─── Pointer ─── */
+canvas.addEventListener('pointerdown', e => {
+  lx = e.clientX; ly = e.clientY;
+  if (e.shiftKey || e.button === 1 || e.altKey) { panning = true; dragging = false; }
+  else { dragging = true; panning = false; }
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointerup', () => { dragging = false; panning = false; });
+canvas.addEventListener('pointermove', e => {
+  const dx = e.clientX - lx, dy = e.clientY - ly;
+  if (panning) { panX += dx; panY -= dy; }
+  else if (dragging) {
+    rotY += dx * 0.008;
+    rotX += dy * 0.008;
+    rotX = Math.max(-1.4, Math.min(1.4, rotX));
+  }
+  lx = e.clientX; ly = e.clientY;
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoom *= e.deltaY > 0 ? 1.08 : 0.92;
+  zoom = Math.max(2.0, Math.min(40, zoom));
+}, { passive: false });
+
+/* ─── UI wiring ─── */
+function setKappa(k) {
+  const prev = kappaScale;
+  kappaScale = Math.max(-3, Math.min(3, k));
+  document.getElementById('kappa').value = Math.round(kappaScale * 100);
+  document.getElementById('kappav').textContent = kappaScale.toFixed(2);
+  document.getElementById('kfine').textContent = kappaScale.toFixed(2);
+  maybeNaturalNucleate(prev, kappaScale);
+  prevK = kappaScale;
+}
+document.getElementById('kappa').oninput = e => setKappa((+e.target.value) / 100);
+document.getElementById('kdown').onclick = () => setKappa(kappaScale - 0.01);
+document.getElementById('kup').onclick = () => setKappa(kappaScale + 0.01);
+document.getElementById('kdown10').onclick = () => setKappa(kappaScale - 0.10);
+document.getElementById('kup10').onclick = () => setKappa(kappaScale + 0.10);
+
+document.getElementById('quality').oninput = e => { quality = +e.target.value; };
+document.getElementById('struct').oninput = e => { showStruct = +e.target.value; };
+document.getElementById('packdens').oninput = e => {
+  packDens = +e.target.value;
+  PACKED = buildPackedBackground(packDens);
+  BASE = PACKED[0].map(c => c.slice());
+  recomputeShellAxis();
+};
+
+document.getElementById('setplus').onclick = () => addOneSet();
+document.getElementById('setminus').onclick = () => removeOneSet();
+document.getElementById('natnuc').onclick = () => {
+  naturalNucleation = !naturalNucleation;
+  document.getElementById('natv').textContent = naturalNucleation ? 'ON' : 'OFF';
+};
+
+document.getElementById('emit').onclick = function () {
+  emitMode = !emitMode;
+  this.classList.toggle('on', emitMode);
+  this.textContent = emitMode ? 'Internal emit ON' : 'Internal emit (self-light)';
+};
+document.getElementById('breathe').onclick = function () {
+  breathing = !breathing;
+  this.classList.toggle('on', breathing);
+  this.textContent = breathing ? 'Breathing ON' : 'Breathing OFF';
+};
+document.getElementById('pause').onclick = () => { paused = !paused; };
+document.getElementById('reset').onclick = () => {
+  rotY = 0.55; rotX = 0.28; zoom = 9.0; panX = 0; panY = 0;
+  splitLevel = 0; BASE_SECOND = null; BASE_THIRD = null; extraSets = [];
+  updateSetLabel();
+  setKappa(1.2);
+};
+
+/* Sweep */
+let sweepTimer = null;
+document.getElementById('sweep').onclick = () => {
+  if (sweepTimer) { clearInterval(sweepTimer); sweepTimer = null; return; }
+  // −3 → +3 → −3 in 0.01 steps
+  let k = -3.0, phase = 0; // 0 up, 1 down
+  sweepTimer = setInterval(() => {
+    if (phase === 0) {
+      k += 0.05;
+      if (k >= 3) { k = 3; phase = 1; }
+    } else {
+      k -= 0.05;
+      if (k <= -3) { k = -3; clearInterval(sweepTimer); sweepTimer = null; }
+    }
+    setKappa(k);
+  }, 40);
+};
+document.getElementById('cycle12').onclick = () => document.getElementById('sweep').click();
+
+/* Metrics: CPU probe rays through same centres (lightweight sample) */
+const metricsLog = [];
+const COUNTS = { CRYPTIC:0, CAUSTIC:0, PRISMATIC:0, KINETIC:0, SCOTOPIC:0 };
+
+function sampleModes() {
+  const C = deformedCentres().slice(0, MAX_SPHERES);
+  const R = SPH_R0 * breathScale().rad;
+  const N = 400;
+  for (const k of Object.keys(COUNTS)) COUNTS[k] = 0;
+  // Fibonacci sphere sample from camera
+  const cy = Math.cos(rotY), sy = Math.sin(rotY);
+  const cx = Math.cos(rotX), sx = Math.sin(rotX);
+  const ro = [sy*cx*zoom, sx*zoom, cy*cx*zoom];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < N; i++) {
+    const y = 1 - (i / (N-1)) * 2;
+    const rad = Math.sqrt(Math.max(0, 1 - y*y));
+    const th = golden * i;
+    let rd = [Math.cos(th)*rad, y, Math.sin(th)*rad];
+    // face toward origin roughly
+    const to = [-ro[0], -ro[1], -ro[2]];
+    const tL = Math.hypot(to[0],to[1],to[2])||1;
+    rd = [to[0]/tL*0.7 + rd[0]*0.3, to[1]/tL*0.7 + rd[1]*0.3, to[2]/tL*0.7 + rd[2]*0.3];
+    let rL = Math.hypot(rd[0],rd[1],rd[2])||1;
+    rd = [rd[0]/rL, rd[1]/rL, rd[2]/rL];
+
+    let t = 0, totalTurn = 0, maxSf = 0, memAcc = 0, alignAcc = 0, intensity = 1;
+    let px = ro[0], py = ro[1], pz = ro[2];
+    let pdx = rd[0], pdy = rd[1], pdz = rd[2];
+    for (let s = 0; s < 40; s++) {
+      // distance to nearest sphere
+      let d = 1e9;
+      for (const c of C) {
+        const dx=px-c[0], dy=py-c[1], dz=pz-c[2];
+        d = Math.min(d, Math.hypot(dx,dy,dz) - R);
+      }
+      const mf = Math.exp(-d*d*18);
+      memAcc += mf;
+      maxSf = Math.max(maxSf, mf * (0.4 + 0.6*Math.abs(kappaScale)/3));
+      // crude bend
+      const bend = 0.012 * kappaScale * (0.3 + 0.7*mf) * 0.05;
+      // gradient approx toward nearest
+      let gx=0,gy=0,gz=0;
+      for (const c of C) {
+        const dx=px-c[0], dy=py-c[1], dz=pz-c[2];
+        const L=Math.hypot(dx,dy,dz)||1;
+        const w = Math.exp(-((L-R)**2)*10);
+        gx += dx/L*w; gy += dy/L*w; gz += dz/L*w;
+      }
+      let ndx = pdx + gx*bend, ndy = pdy + gy*bend, ndz = pdz + gz*bend;
+      const nL = Math.hypot(ndx,ndy,ndz)||1;
+      ndx/=nL; ndy/=nL; ndz/=nL;
+      totalTurn += Math.acos(Math.max(-1, Math.min(1, pdx*ndx+pdy*ndy+pdz*ndz)));
+      pdx=ndx; pdy=ndy; pdz=ndz;
+      alignAcc += Math.abs(pdx*SHELL_AXIS[0]+pdy*SHELL_AXIS[1]+pdz*SHELL_AXIS[2]);
+      intensity *= (1 - 0.008*Math.abs(kappaScale)*mf);
+      if (d < 0.02) break;
+      const step = Math.max(0.02, Math.min(0.35, Math.abs(d)));
+      px += pdx*step; py += pdy*step; pz += pdz*step;
+      t += step;
+      if (t > 20) break;
+    }
+    const meanAlign = alignAcc / 40;
+    const memFrac = memAcc / 40;
+    const avgTurn = totalTurn;
+    let mode = 'KINETIC';
+    if (maxSf > 0.85 && avgTurn > 0.07 && intensity > 0.25) mode = 'CAUSTIC';
+    else if (avgTurn > 0.055 && memFrac > 0.18 && intensity > 0.2) mode = 'PRISMATIC';
+    else if (memFrac > 0.35 && avgTurn < 0.04 && meanAlign < 0.55) mode = 'CRYPTIC';
+    else if (memFrac > 0.4 && intensity < 0.5 && avgTurn < 0.1) mode = 'SCOTOPIC';
+    COUNTS[mode]++;
+  }
+  for (const k of Object.keys(COUNTS)) {
+    const el = document.getElementById('c' + k);
+    if (el) el.textContent = COUNTS[k];
+  }
+}
+
+function captureMetrics(tag) {
+  sampleModes();
+  const total = 400;
+  const row = {
+    tag: tag || ('κ=' + kappaScale.toFixed(3)),
+    kappa: +kappaScale.toFixed(4),
+    N: total,
+    CAUSTIC: COUNTS.CAUSTIC, PRISMATIC: COUNTS.PRISMATIC,
+    KINETIC: COUNTS.KINETIC, SCOTOPIC: COUNTS.SCOTOPIC, CRYPTIC: COUNTS.CRYPTIC,
+    fC: +(COUNTS.CAUSTIC/total).toFixed(4),
+    fP: +(COUNTS.PRISMATIC/total).toFixed(4),
+    fK: +(COUNTS.KINETIC/total).toFixed(4),
+    fS: +(COUNTS.SCOTOPIC/total).toFixed(4),
+    fX: +(COUNTS.CRYPTIC/total).toFixed(4)
+  };
+  metricsLog.push(row);
+  const el = document.getElementById('mbody');
+  el.innerHTML = metricsLog.slice(-10).map(r =>
+    `<div class="rowm"><span>${r.tag}</span><span class="pct">X${(r.fX*100).toFixed(1)}% C${(r.fC*100).toFixed(1)}% P${(r.fP*100).toFixed(1)}% K${(r.fK*100).toFixed(1)}% S${(r.fS*100).toFixed(1)}%</span></div>`
+  ).join('');
+  return row;
+}
+document.getElementById('capture').onclick = () => captureMetrics();
+document.getElementById('exportcsv').onclick = () => {
+  if (!metricsLog.length) captureMetrics();
+  const hdr = 'kappa,N,CAUSTIC,PRISMATIC,KINETIC,SCOTOPIC,CRYPTIC,fC,fP,fK,fS,fX\n';
+  const body = metricsLog.map(r =>
+    [r.kappa,r.N,r.CAUSTIC,r.PRISMATIC,r.KINETIC,r.SCOTOPIC,r.CRYPTIC,r.fC,r.fP,r.fK,r.fS,r.fX].join(',')
+  ).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([hdr+body], {type:'text/csv'}));
+  a.download = 'urf_webgl_metrics.csv';
+  a.click();
+};
+
+updateSetLabel();
+
+/* ─── Render loop ─── */
+let lastT = performance.now(), frames = 0, fpsT = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (paused) return;
+
+  const dt = Math.min(0.05, (now - lastT) / 1000);
+  lastT = now;
+  if (breathing) breathPhase = (breathPhase + dt * 1.2) % 12;
+
+  frames++;
+  if (now - fpsT > 500) {
+    document.getElementById('fps').textContent = Math.round(frames * 1000 / (now - fpsT)) + ' fps';
+    frames = 0; fpsT = now;
+  }
+
+  const centres = deformedCentres();
+  const nSph = Math.min(centres.length, MAX_SPHERES);
+  document.getElementById('nspheres').textContent = String(nSph);
+
+  const b = breathScale();
+  const sphR = SPH_R0 * b.rad;
+
+  gl.useProgram(prog);
+  gl.uniform2f(u.res, canvas.width, canvas.height);
+  gl.uniform1f(u.time, now * 0.001);
+  gl.uniform1f(u.kappa, kappaScale);
+  gl.uniform1f(u.zoom, zoom);
+  gl.uniform1f(u.rotX, rotX);
+  gl.uniform1f(u.rotY, rotY);
+  gl.uniform2f(u.pan, panX, panY);
+  gl.uniform1i(u.steps, quality);
+  gl.uniform1i(u.nSph, nSph);
+  gl.uniform1i(u.show, showStruct);
+  gl.uniform1i(u.emit, emitMode ? 1 : 0);
+  gl.uniform1f(u.sphR, sphR);
+  gl.uniform3fv(u.axis, SHELL_AXIS);
+
+  for (let i = 0; i < MAX_SPHERES; i++) {
+    if (i < nSph) gl.uniform3f(u.centres[i], centres[i][0], centres[i][1], centres[i][2]);
+    else gl.uniform3f(u.centres[i], 0, 0, 0);
+  }
+
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+requestAnimationFrame(frame);
+
+// initial mode sample
+setTimeout(() => sampleModes(), 200);
+</script>
+</body>
+</html>

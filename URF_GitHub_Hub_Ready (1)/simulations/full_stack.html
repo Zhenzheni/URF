@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>URF · Full Stack · (1 ≬ 1) ⊢ 3</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#070710;color:#e6e3d8;font-family:Georgia,'Times New Roman',serif}
+canvas{display:block}
+#c{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0}
+#hud{position:fixed;top:0;left:0;width:288px;height:100%;background:rgba(7,7,16,.94);border-right:1px solid rgba(255,255,255,.07);z-index:20;overflow-y:auto;backdrop-filter:blur(12px);display:flex;flex-direction:column}
+#hud h1{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#6f8fb5;padding:14px 14px 4px;font-weight:400}
+.stagebox{padding:4px 14px 12px;border-bottom:1px solid rgba(255,255,255,.05)}
+.snum{font-size:8px;letter-spacing:.18em;color:rgba(255,255,255,.26);text-transform:uppercase}
+.sname{font-size:16px;color:#e6e3d8;margin:2px 0 6px;line-height:1.2}
+.sdesc{font-size:10.5px;line-height:1.6;color:rgba(199,195,182,.68)}
+.formula{font-family:'Courier New',monospace;font-size:10px;color:#8fb0d8;background:rgba(143,176,216,.07);border-left:2px solid rgba(143,176,216,.4);padding:6px 8px;margin:7px 0;border-radius:0 3px 3px 0;line-height:1.7;word-break:break-word}
+.chip{display:inline-block;font-size:8px;letter-spacing:.07em;text-transform:uppercase;padding:2px 6px;border-radius:8px;margin:1px 2px 1px 0}
+.cd{background:rgba(110,200,130,.13);color:#7fd093;border:1px solid rgba(110,200,130,.28)}
+.cc{background:rgba(216,170,100,.13);color:#e0b46e;border:1px solid rgba(216,170,100,.28)}
+.co{background:rgba(180,140,220,.13);color:#c4a0dc;border:1px solid rgba(180,140,220,.28)}
+.cn{background:rgba(200,110,110,.13);color:#d68080;border:1px solid rgba(200,110,110,.28)}
+#ctrls{padding:10px 14px;display:flex;flex-direction:column;gap:7px}
+.row{display:flex;gap:6px}
+.btn{flex:1;padding:8px 0;border-radius:4px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.03);color:rgba(230,227,216,.68);font-size:10px;letter-spacing:.06em;cursor:pointer;transition:all .13s;font-family:Georgia,serif}
+.btn:hover{background:rgba(127,163,204,.15);border-color:#7fa3cc;color:#fff}
+.btn.on{background:rgba(127,163,204,.2);border-color:#7fa3cc;color:#9bb0cc}
+.btn:disabled{opacity:.28;cursor:not-allowed}
+.lab{font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.28);margin:7px 0 2px}
+.slider{width:100%;-webkit-appearance:none;height:2px;background:rgba(255,255,255,.11);border-radius:1px;outline:none;cursor:pointer}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#7fa3cc;cursor:pointer}
+.ro{font-family:'Courier New',monospace;font-size:9px;color:#8fb0d8;text-align:right}
+#dots{display:flex;gap:4px;padding:9px 14px 2px;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.13);cursor:pointer;transition:all .18s}
+.dot.active{background:#7fa3cc;box-shadow:0 0 8px rgba(127,163,204,.65);transform:scale(1.3)}
+.dot.done{background:rgba(127,163,204,.38)}
+#sp{position:fixed;top:22px;right:22px;width:224px;z-index:20;background:rgba(7,7,16,.93);border:1px solid rgba(255,215,0,.22);border-right:3px solid #ffd700;border-radius:10px 2px 2px 10px;padding:12px 14px;pointer-events:auto;backdrop-filter:blur(10px)}
+.sp-title{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,215,0,.55);margin-bottom:5px}
+.sp-src{font-size:8px;color:rgba(255,255,255,.35);margin-bottom:3px}
+#src-slider{width:100%;accent-color:#ffd700;margin-bottom:3px;pointer-events:auto}
+#src-hz{font-size:9px;color:#ffd700;margin-bottom:7px}
+.sr{display:flex;align-items:center;gap:5px;margin:3px 0;font-size:8.5px}
+.sdot{width:9px;height:9px;border-radius:50%;flex-shrink:0;transition:box-shadow .12s}
+.slbl{color:rgba(255,255,255,.42);width:44px;flex-shrink:0}
+.shz{color:#4af626;width:42px;font-weight:bold;font-size:8.5px}
+.sbar{flex:1;height:4px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.sbf{height:100%;border-radius:2px;transition:width .12s}
+.sobl{width:24px;text-align:right;font-size:7.5px;color:rgba(255,100,100,.55)}
+#bot{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(7,7,16,.88);border:1px solid rgba(255,255,255,.08);border-radius:28px;padding:8px 18px;z-index:20;display:flex;align-items:center;gap:12px;backdrop-filter:blur(10px)}
+.pbtn{background:none;border:none;color:#9bb0cc;font-size:16px;cursor:pointer;padding:1px 4px;font-family:system-ui}
+.pbtn:hover{color:#fff}
+#scrub{width:200px;-webkit-appearance:none;height:2px;background:rgba(255,255,255,.14);border-radius:1px;outline:none;cursor:pointer}
+#scrub::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#9bb0cc;cursor:pointer}
+#scrubval{font-family:'Courier New',monospace;font-size:9px;color:#8fb0d8;min-width:80px}
+#flash{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:72px;font-weight:bold;color:#fff;text-shadow:0 0 50px #4af626;opacity:0;z-index:50;pointer-events:none;letter-spacing:.14em}
+#gate{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 35%,#0e1426,#070710);cursor:pointer;transition:opacity .6s;overflow-y:auto;padding:6vh 8vw;text-align:center}
+#gate.gone{opacity:0;pointer-events:none}
+#gate .kk{font-size:10px;letter-spacing:.4em;text-transform:uppercase;color:#6f8fb5;margin-bottom:22px}
+#gate h1{font-size:clamp(24px,4vw,50px);font-weight:400;line-height:1.08;margin-bottom:6px}
+#gate .sub{display:block;font-size:clamp(12px,1.6vw,18px);color:#9bb0cc;margin-top:12px;letter-spacing:.04em}
+#gate .rule{width:60px;height:1px;background:linear-gradient(90deg,transparent,#6f8fb5,transparent);margin:24px auto}
+#gate .desc{max-width:660px;font-size:clamp(12px,1.4vw,15px);line-height:1.8;color:#c7c3b6;margin:0 auto 16px}
+#gate .enter{margin-top:28px;font-family:Georgia,serif;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#0a0a14;background:linear-gradient(180deg,#a9c4e6,#7fa3cc);border:none;border-radius:4px;padding:12px 34px;cursor:pointer;box-shadow:0 6px 22px rgba(127,163,204,.3)}
+#gate .enter:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(127,163,204,.44)}
+#hint{position:fixed;bottom:56px;right:14px;z-index:10;font-size:8.5px;color:rgba(255,255,255,.14);text-align:right;line-height:1.9;pointer-events:none}
+#math-overlay{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(7,7,16,.92);border:1px solid rgba(255,215,0,.25);border-radius:12px;padding:12px 20px;z-index:30;display:none;backdrop-filter:blur(10px);max-width:90vw;pointer-events:auto;text-align:center}
+#math-overlay .m-title{font-size:10px;letter-spacing:.15em;color:#ffd700;margin-bottom:4px}
+#math-overlay .m-body{font-size:11px;font-family:'Courier New',monospace;color:#8fb0d8;line-height:1.7}
+#math-overlay .m-close{position:absolute;top:4px;right:10px;color:rgba(255,255,255,.3);cursor:pointer;font-size:14px}
+#math-overlay .m-close:hover{color:#fff}
+#nav-mode{position:fixed;bottom:56px;left:50%;transform:translateX(-50%);font-size:8.5px;color:rgba(74,246,38,.45);z-index:10;pointer-events:none;letter-spacing:.08em}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- GATE -->
+<div id="gate">
+  <div class="kk">Unified Relational Framework</div>
+  <h1>The Full Stack
+    <span class="sub">9-stack resonance · membrane shells · BC helix · trefoil · torus · Gamma hierarchy</span>
+  </h1>
+  <div class="rule"></div>
+  <div class="desc">All derived structures present simultaneously. Every helix unit carries its own sphere and membrane skin. The resonance propagates from stack 1 downward — same frequency, faithful retransmission, natural phase delay and attenuation. At S³ closure (n=30) the torus emerges. The torus is not imposed; it is what closure looks like from inside flat space. <b>Now with full Gamma polynomial expansion and circle map dynamics.</b></div>
+  <button class="enter" id="initBtn">Initialise the bond</button>
+  <div style="margin-top:20px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#5d6a80">Aaron Matthew Schoenman and Christopher David Peterson — 2026</div>
+</div>
+
+<!-- FLASH -->
+<div id="flash">⊢</div>
+<div id="hint">Drag orbit · Scroll zoom · <b style="color:#4af626">F</b>=fly mode</div>
+<div id="nav-mode">ORBIT MODE — drag · scroll zoom · F=fly</div>
+
+<!-- HUD -->
+<div id="hud">
+  <h1>URF · Build Simulation</h1>
+  <div id="dots"></div>
+  <div class="stagebox">
+    <div class="snum" id="s-num">—</div>
+    <div class="sname" id="s-name">—</div>
+    <div class="sdesc" id="s-desc">—</div>
+    <div id="s-form"></div>
+    <div id="s-chips"></div>
+  </div>
+  <div id="ctrls">
+    <div class="row">
+      <button class="btn" id="b-prev">◀ Back</button>
+      <button class="btn" id="b-next">Next ▶</button>
+    </div>
+    <button class="btn" id="b-play">▶ Auto-play</button>
+    <div id="stage-x"></div>
+    <div class="lab">Handedness <span style="color:rgba(216,170,100,.6)">(convention)</span></div>
+    <div class="row">
+      <button class="btn" id="h-l">Left</button>
+      <button class="btn on" id="h-r">Right</button>
+      <button class="btn" id="h-b">Both</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px">
+      <span style="font-size:9px;color:rgba(255,255,255,.35)">Ghost earlier stages</span>
+      <button class="btn on" id="b-ghost" style="flex:0 0 46px;padding:4px 0;font-size:9px">On</button>
+    </div>
+    <div class="row" style="margin-top:4px">
+      <button class="btn" id="b-3d">⊿ 3D</button>
+      <button class="btn" id="b-rst">↺ Reset</button>
+    </div>
+    <div class="row" style="margin-top:4px">
+      <button class="btn" id="b-math" style="background:rgba(255,215,0,.1);border-color:#ffd700;color:#ffd700">Σ Math</button>
+    </div>
+  </div>
+</div>
+
+<!-- STACK PANEL -->
+<div id="sp">
+  <div class="sp-title">9-Stack Resonance</div>
+  <div class="sp-src">Source frequency · stack 1 drives all</div>
+  <input type="range" id="src-slider" min="55" max="880" value="220" step="1"/>
+  <div id="src-hz">220 Hz</div>
+  <div style="display:flex;gap:5px;margin-bottom:7px;pointer-events:auto">
+    <button id="b-sweep" style="flex:1;padding:5px;font-size:8.5px;letter-spacing:.08em;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.3);border-radius:4px;color:#ffd700;cursor:pointer;font-family:Georgia,serif">▷ Sweep</button>
+    <select id="sweep-speed" style="flex:1;padding:4px;font-size:8px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.15);color:#9bb0cc;border-radius:4px">
+      <option value="0.15">Slow</option>
+      <option value="0.35" selected>Med</option>
+      <option value="0.8">Fast</option>
+    </select>
+  </div>
+  <div id="stack-rows"></div>
+  <div style="font-size:7.5px;color:rgba(255,215,0,.3);line-height:1.8;margin-top:6px;border-top:1px solid rgba(255,215,0,.1);padding-top:5px">
+    freq: faithful · phase: d/c<br>amp: 1/r² · obstruct: K×sin
+  </div>
+</div>
+
+<!-- BOTTOM BAR -->
+<div id="bot">
+  <button class="pbtn" id="p-bk">⏮</button>
+  <button class="pbtn" id="p-pl">▶</button>
+  <button class="pbtn" id="p-fw">⏭</button>
+  <input type="range" id="scrub" min="0" max="1000" value="0"/>
+  <div id="scrubval">Stage 1</div>
+</div>
+
+<!-- MATH OVERLAY -->
+<div id="math-overlay">
+  <span class="m-close" onclick="document.getElementById('math-overlay').style.display='none'">✕</span>
+  <div class="m-title">Unified Relational Framework — Mathematical Constants &amp; Expansions</div>
+  <div class="m-body" id="math-body">Loading…</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── CONSTANTS ──────────────────────────────────────────────────────────
+var PI=Math.PI, TAU=PI*2, sq3=Math.sqrt(3), s=1.0;
+var THETA_BC=Math.acos(-2/3);
+var H_BC=s/Math.sqrt(10);
+var R_BC=3*s*sq3/10;
+var SQRT6=Math.sqrt(6), SQRT2=Math.sqrt(2);
+var SQRT6_4=SQRT6/4;
+var INNER_EXACT=(1-SQRT6_4)*s;
+var OUTER_EXACT=(1+SQRT6_4)*s;
+var TET_H=s*Math.sqrt(2/3);
+var COMMA_R=Math.pow(2,1200*Math.log2(Math.pow(1.5,12)/128)/1200);
+var LAMBDA_CROSS=6*SQRT2;
+var LAMBDA_LO=8.340;
+var LAMBDA_HI=8.600;
+var G_SELF=6*SQRT2/(1+SQRT6_4);
+var T_SELF=1/G_SELF;
+var E_RATIO_CROSS=LAMBDA_CROSS/8;
+var E_RATIO_LO=LAMBDA_LO/8;
+var E_RATIO_HI=LAMBDA_HI/8;
+var E_RATIO_INNER=SQRT6/9;
+var E_RATIO_APEX=Math.sqrt(2/3);
+var COMMA_CENTS=1200*Math.log2(Math.pow(1.5,12)/128);
+var kappa = R_BC/(R_BC*R_BC+(H_BC/(2*PI))*(H_BC/(2*PI)));
+var tau = (H_BC/(2*PI))/(R_BC*R_BC+(H_BC/(2*PI))*(H_BC/(2*PI)));
+var kappa_tilde=kappa*s, tau_tilde=tau*s;
+var euler_gamma=0.5772156649015329;
+var V2_val=PI*R_BC*R_BC;
+var V3_val=(PI/3)*R_BC*R_BC*R_BC;
+var V4_val=(PI/4)*R_BC*R_BC*R_BC*R_BC+(euler_gamma/2)*R_BC*R_BC;
+var V5_val=(PI/6)*Math.pow(R_BC,5)+(euler_gamma/6)*Math.pow(R_BC,3)+(euler_gamma/2)*R_BC*R_BC;
+var V6_val=(PI/36)*Math.pow(R_BC,6)+(euler_gamma/24)*Math.pow(R_BC,4)+(euler_gamma/6)*Math.pow(R_BC,3)+(euler_gamma/2)*R_BC*R_BC;
+var winding=THETA_BC/(2*PI/3);
+function cf_terms(x,n){var t=[]; for(var i=0;i<n;i++){var a=Math.floor(x); t.push(a); x-=a; if(x<1e-15)break; x=1/x;} return t;}
+var cf=cf_terms(winding,10);
+function convergent(terms,k){var f=[1,0]; for(var i=k;i>=0;i--){var nf=[terms[i]*f[0]+f[1], f[0]]; f=nf;} return f;}
+var convs=[]; for(var i=0;i<Math.min(cf.length,6);i++){var c=convergent(cf,i); convs.push({p:c[0],q:c[1]});}
+function gapAtN(n){var ph=(n*THETA_BC)%(2*PI/3); return Math.min(ph,(2*PI/3)-ph);}
+var gaps={1:gapAtN(1),10:gapAtN(10),30:gapAtN(30),61:gapAtN(61)};
+var gap30_deg=gaps[30]*180/PI;
+
+// ── THREE.JS SETUP ──────────────────────────────────────────────────────
+var cv=document.getElementById('c');
+var renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.8;
+var scene=new THREE.Scene(); scene.background=new THREE.Color(0x0a0f1a); scene.fog=new THREE.FogExp2(0x070710,0.004);
+var cam=new THREE.PerspectiveCamera(46,window.innerWidth/window.innerHeight,0.01,400);
+var orb={th:0.55,ph:1.0,r:5.5,px:0,py:0};
+var mb={dn:false,x:0,y:0};
+var FLY={active:false,yaw:0,pitch:0,vel:new THREE.Vector3(),keys:{w:false,a:false,s:false,d:false,q:false,e:false,shift:false}};
+var NAV_SPEED=0.12, NAV_DAMPING=0.88;
+var BOUNDARIES=[];
+
+function camUp(){if(!FLY.active){cam.position.set(orb.r*Math.sin(orb.ph)*Math.sin(orb.th)+orb.px,orb.r*Math.cos(orb.ph)+orb.py,orb.r*Math.sin(orb.ph)*Math.cos(orb.th)); cam.lookAt(orb.px,orb.py,0);}}
+camUp();
+
+// ── NAVIGATION EVENTS ──────────────────────────────────────────────────
+function enterFly(){FLY.active=true; FLY.yaw=orb.th+PI; FLY.pitch=PI/2-orb.ph; cam.position.set(orb.r*Math.sin(orb.ph)*Math.sin(orb.th)+orb.px,orb.r*Math.cos(orb.ph)+orb.py,orb.r*Math.sin(orb.ph)*Math.cos(orb.th)); document.getElementById('nav-mode').textContent='FLY MODE — WASD move · mouse look · F=orbit · Q/E up/down'; cv.requestPointerLock();}
+function enterOrbit(){FLY.active=false; document.exitPointerLock(); document.getElementById('nav-mode').textContent='ORBIT MODE — drag · scroll zoom · F=fly';}
+document.addEventListener('pointerlockchange',function(){if(document.pointerLockElement!==cv&&FLY.active)enterOrbit();});
+cv.addEventListener('mousedown',function(e){if(!FLY.active){mb.dn=true;mb.x=e.clientX;mb.y=e.clientY;}});
+window.addEventListener('mouseup',function(){mb.dn=false;});
+window.addEventListener('mousemove',function(e){
+ if(FLY.active){FLY.yaw-=e.movementX*.002; FLY.pitch=Math.max(-PI/2+.05,Math.min(PI/2-.05,FLY.pitch+e.movementY*.002)); return;}
+ if(!mb.dn)return; orb.th-=(e.clientX-mb.x)*.007; orb.ph=Math.max(.06,Math.min(PI-.06,orb.ph+(e.clientY-mb.y)*.007)); mb.x=e.clientX; mb.y=e.clientY; camUp();
+});
+cv.addEventListener('wheel',function(e){if(FLY.active){NAV_SPEED=Math.max(.02,Math.min(1.2,NAV_SPEED-e.deltaY*.0005));}else{orb.r=Math.max(1,Math.min(80,orb.r+e.deltaY*.015));camUp();}});
+window.addEventListener('keydown',function(e){var k=e.key.toLowerCase(); if(k==='f'){FLY.active?enterOrbit():enterFly();} if(k==='w')FLY.keys.w=true; if(k==='s')FLY.keys.s=true; if(k==='a')FLY.keys.a=true; if(k==='d')FLY.keys.d=true; if(k==='q')FLY.keys.q=true; if(k==='e')FLY.keys.e=true; if(k==='shift')FLY.keys.shift=true;});
+window.addEventListener('keyup',function(e){var k=e.key.toLowerCase(); if(k==='w')FLY.keys.w=false; if(k==='s')FLY.keys.s=false; if(k==='a')FLY.keys.a=false; if(k==='d')FLY.keys.d=false; if(k==='q')FLY.keys.q=false; if(k==='e')FLY.keys.e=false; if(k==='shift')FLY.keys.shift=false;});
+function updateFly(dt){
+ if(!FLY.active)return;
+ var cosP=Math.cos(FLY.pitch), sinP=Math.sin(FLY.pitch), cosY=Math.cos(FLY.yaw), sinY=Math.sin(FLY.yaw);
+ var fwd=new THREE.Vector3(cosP*sinY,sinP,cosP*cosY); var right=new THREE.Vector3(cosY,0,-sinY); var up2=new THREE.Vector3(0,1,0);
+ var spd=FLY.keys.shift?NAV_SPEED*3.5:NAV_SPEED;
+ if(FLY.keys.w)FLY.vel.addScaledVector(fwd,spd); if(FLY.keys.s)FLY.vel.addScaledVector(fwd,-spd); if(FLY.keys.a)FLY.vel.addScaledVector(right,-spd); if(FLY.keys.d)FLY.vel.addScaledVector(right,spd); if(FLY.keys.q)FLY.vel.addScaledVector(up2,-spd); if(FLY.keys.e)FLY.vel.addScaledVector(up2,spd);
+ FLY.vel.multiplyScalar(NAV_DAMPING);
+ var newPos=cam.position.clone().add(FLY.vel);
+ resolveCollision(newPos);
+ cam.position.copy(newPos);
+ cam.quaternion.setFromEuler(new THREE.Euler(FLY.pitch,FLY.yaw,0,'YXZ'));
+ var from=cam.position.clone(); orb.r=from.length(); orb.th=Math.atan2(from.x,from.z); orb.ph=Math.acos(Math.max(-1,Math.min(1,from.y/orb.r)));
+}
+function resolveCollision(pos){var hit=false; for(var bi=0;bi<BOUNDARIES.length;bi++){var b=BOUNDARIES[bi]; var dx=pos.x-b.x, dy=pos.y-b.y, dz=pos.z-b.z; var d2=dx*dx+dy*dy+dz*dz; var minD=b.r+0.15; if(d2<minD*minD&&d2>.0001){var dist=Math.sqrt(d2); var push=(minD-dist)/dist; pos.x+=dx*push; pos.y+=dy*push; pos.z+=dz*push; hit=true;}} return hit;}
+function rebuildBoundaries(){BOUNDARIES=[]; for(var i=0;i<N_STACKS;i++){var yOff=(i-(N_STACKS-1)/2)*STACK_H_SEP; for(var n=0;n<=helixN;n+=2){var ang=n*THETA_BC; BOUNDARIES.push({x:R_BC*Math.cos(ang),y:yOff+n*H_BC-helixN*H_BC/2,z:R_BC*Math.sin(ang),r:INNER_EXACT*.42});} BOUNDARIES.push({x:0,y:yOff,z:0,r:INNER_EXACT*.22});} if(stageIdx>=3){[vA,vB,vC,vD].forEach(function(v){BOUNDARIES.push({x:v.x,y:v.y,z:v.z,r:.18});});}}
+
+// ── LIGHTS ──────────────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0x2a3e58,4));
+var dl1=new THREE.DirectionalLight(0x99b8e8,2.4); dl1.position.set(6,10,8); scene.add(dl1);
+var dl2=new THREE.DirectionalLight(0x5a7aaa,1.2); dl2.position.set(-5,3,-5); scene.add(dl2);
+var pl=new THREE.PointLight(0x9a6cff,1.4,120); pl.position.set(0,7,0); scene.add(pl);
+var tl=new THREE.PointLight(0xffd700,0,35); tl.position.set(0,0,4); scene.add(tl);
+var grid=new THREE.GridHelper(50,80,0x101830,0x0b0f1e); grid.position.y=-12; scene.add(grid);
+
+// ── STATE ──────────────────────────────────────────────────────────────
+var ST={K:0,d:1.0,t:0,ticks:0,HAND:1,BOTH:false,GHOSTS:true,playing:false,holdT:0};
+var srcFreq=220; var stageIdx=0, stageProg=1.0;
+var N_STACKS=9; var STACK_H_SEP=5.5;
+var SCOLS=[0xffd700,0xff3366,0x33aaff,0x4af626,0xff8833,0xaa44ff,0x44ffcc,0xff44aa,0xffff44];
+var SSTATE=[]; for(var i=0;i<N_STACKS;i++) SSTATE.push({hz:srcFreq,amp:i===0?1:0,phase:0,obstr:0});
+function updateResonance(t){SSTATE[0].hz=srcFreq; SSTATE[0].amp=1; SSTATE[0].phase=0; SSTATE[0].obstr=0; for(var i=1;i<N_STACKS;i++){var dist=i*STACK_H_SEP; var ph=(t-dist)%TAU; var atten=1/(1+dist*0.04); var obstr=Math.min(ST.K*0.2*(1+i*.07),0.82); var symF=Math.abs(Math.sin((i%3)*PI/3))*.12; var tot=Math.min(obstr+symF,.9); SSTATE[i].hz=srcFreq; SSTATE[i].phase=ph; SSTATE[i].amp=atten*(1-tot); SSTATE[i].obstr=tot;}}
+
+// ── GEOMETRY HELPERS ──────────────────────────────────────────────────
+function mat(col,ei,op,wf){ei=ei||1.5; op=op===undefined?1:op; return new THREE.MeshPhongMaterial({color:col,emissive:col,emissiveIntensity:ei*.48,shininess:55,transparent:op<1,opacity:op,wireframe:!!wf,depthWrite:op>.55});}
+function mkTube(pts,r,col,op){if(pts.length<2)return null; var c=new THREE.CatmullRomCurve3(pts,false,'catmullrom',.06); var g=new THREE.TubeGeometry(c,Math.max(pts.length*3,20),r,7,false); return new THREE.Mesh(g,mat(col,1.2,op));}
+function mkSph(v,r,col,op,em){var m=new THREE.Mesh(new THREE.SphereGeometry(r,24,18),mat(col,em||.4,op)); m.position.copy(v); return m;}
+function mkWire(v,r,col,op){var m=new THREE.Mesh(new THREE.SphereGeometry(r,20,14),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:op,wireframe:true})); m.position.copy(v); return m;}
+function arcPts(cx,cy,r,a1,a2,n){var p=[]; for(var i=0;i<=n;i++){var a=a1+(i/n)*(a2-a1); p.push(new THREE.Vector3(cx+r*Math.cos(a),cy+r*Math.sin(a),0));} return p;}
+function circPts(cx,cy,r,n){return arcPts(cx,cy,r,0,TAU,n);}
+function clear(g){while(g.children.length){var o=g.children.pop(); if(o.geometry)o.geometry.dispose(); if(o.material&&o.material.dispose)o.material.dispose();}}
+
+// ── VERTICES ──────────────────────────────────────────────────────────
+var cx2=s/2, cy2=s*sq3/6;
+var vA=new THREE.Vector3(-cx2,-cy2,0), vB=new THREE.Vector3(s-cx2,-cy2,0), vC=new THREE.Vector3(s/2-cx2,s*sq3/2-cy2,0);
+var vD=new THREE.Vector3(0,0,TET_H);
+var vPAB=new THREE.Vector3(s/2-cx2,-s*sq3/2-cy2,0);
+var vPAC=new THREE.Vector3(-s/2-cx2,s*sq3/2-cy2,0);
+var vPBC=new THREE.Vector3(3*s/2-cx2,s*sq3/2-cy2,0);
+
+// ── GROUPS ────────────────────────────────────────────────────────────
+var GRP={}; ['rt','hex','fork','tet','sph','helix','trefoil','torus','fractal'].forEach(function(k){GRP[k]=new THREE.Group(); scene.add(GRP[k]);});
+var stackGrp=new THREE.Group(); scene.add(stackGrp);
+
+// ── STAGES ────────────────────────────────────────────────────────────
+var STAGES=[
+ {st:'Stage 1',name:'Reuleaux + generating circles',desc:'The equilateral triangle with all three FULL generating circles retained.',form:'K_A: x²+y²=s²  K_B: (x-s)²+y²=s²<br>K_C: (x-s/2)²+(y-s√3/2)²=s²',chips:[['Assumption 1.1','cc'],['derived','cd']]},
+ {st:'Stage 2',name:'Hexagram · 2:1 ratio',desc:'Three circles meet pairwise in six points: three vertices and three external. A regular hexagram with exact 2:1 centroid ratio.',form:'|G–vertex| = s/√3   |G–external| = 2s/√3<br>ratio = 2 exactly',chips:[['derived','cd']]},
+ {st:'Stage 3',name:'Fork sweep θ(d)',desc:'At vertex A the fork opens by θ(d). Sweep d from 0 to s√3. The angle approaches 120° but never arrives — the Crux.',form:'θ(d) = 2π/3 − 2·arcsin(d/2s)<br>θ(0)→120°  θ(s)=60°  θ(s√3)=0°',chips:[['derived','cd'],['Crux: 120° unreachable','cn']]},
+ {st:'Stage 4',name:'4 spheres · tetrahedron · membrane',desc:'The Crux forces the fourth point off-plane. Three circles become FOUR SPHERES of radius s. The real body bulges 0.184s past the flat face.',form:'outer = (1+√6/4)s = 1.612s<br>inner = (1-√6/4)s = 0.388s<br>face bulge = 0.184s · 4 faces',chips:[['circles→spheres','cd'],['forced lift','cd'],['√6 cap geometry','cd']]},
+ {st:'Stage 5',name:'BC helix · 9 stacks · resonance',desc:'Chain the d=s tetrahedron face-to-face. Unique solution: screw arccos(−2/3)=131.81° per tet. Nine stacks each with full sphere skins and membrane shells.',form:'θ_BC = arccos(−2/3) ≈ 131.81°<br>H = s/√10   R = 3s√3/10   never closes in flat R³',chips:[['derived','cd'],['3D Crux: no flat closure','cn'],['9-stack resonance','cc']]},
+ {st:'Stage 6',name:'Trefoil closure in S³',desc:'In S³ the helix closes after exactly 30 tetrahedra as the (2,3) torus knot — the trefoil. Winding numbers 2 and 3 are forced by C₃ symmetry.',form:'(2,3) torus knot:<br>x=(2+cos3t)cos2t  y=sin3t  z=(2+cos3t)sin2t<br>30 tets · winding 2 and 3 · gcd(2,3)=1',chips:[['derived','cd'],['S³ closure','cc']]},
+ {st:'Stage 7',name:'The torus · S³ closure visible',desc:'The trefoil lives on the surface of a torus. This is what the S³ closure looks like projected into R³. The torus precesses at rates 2g and 3g.',form:'ω₁ = 2g = 2·6√2/(1+√6/4)<br>ω₂ = 3g = 3·6√2/(1+√6/4)<br>Beat period = 2π/g',chips:[['S³ realised','cd'],['void is the join','cd']]},
+ {st:'Stage 8',name:'Fractal packing · writhe limit',desc:'Hex close-pack: 7 helices at spacing 2R, the bundle itself a BC helix at scale 2s. Writhe accumulates to ~199.23° — the stacking Crux.',form:'R_k=R·2^k  H_k=H·2^k  (θ scale-free)<br>Wr/level≈33.71°  Σ→67.42° (series limit)<br>effective T_eff≈199.23° per tet — never reached',chips:[['full construction kept','cd'],['writhe limit: series','cn'],['per-level sign open','co']]},
+ {st:'Stage 9',name:'Math · Full equations and Gamma hierarchy',desc:'All derived constants, continued fraction convergents, closure errors, dimensionless curvature/torsion, and Gamma polynomial expansions for V₂ through V₆ with Euler’s constant γ and inherited curvature constants Cᵢ.',form:'θ_BC = '+THETA_BC.toFixed(4)+' rad = '+(THETA_BC*180/PI).toFixed(2)+'°<br>R = '+R_BC.toFixed(4)+'s, H = '+H_BC.toFixed(4)+'s<br>κ̃ = '+kappa_tilde.toFixed(6)+', τ̃ = '+tau_tilde.toFixed(6)+'<br>γ = '+euler_gamma.toFixed(6)+'<br>V₂=πr²+C₁r+C₀<br>V₃=π/3 r³+C₁r+C₂<br>V₄=π/4 r⁴+γ/2 r²+C₁r+C₃<br>V₅=π/6 r⁵+γ/6 r³+γ/2 r²+C₁r+C₃<br>V₆=π/36 r⁶+γ/24 r⁴+γ/6 r³+γ/2 r²+C₁r+C₃',chips:[['all constants','cc'],['Gamma hierarchy','co']]}
+];
+var STAGE_GRPS=[['rt'],['rt','hex'],['rt','fork'],['rt','fork','tet','sph'],['helix'],['helix','trefoil'],['helix','trefoil','torus'],['fractal'],[]];
+var helixN=30;
+
+// ── BUILD FUNCTIONS (all curves as tubes, no lines) ─────────────────
+function buildRT(prog){clear(GRP.rt); 
+ var op=Math.min(prog*1.4,1); var circOp=Math.min(prog*1.2,1)*.5; 
+ [[vA,0xe06a5a],[vB,0x5ab48a],[vC,0x5a8ac0]].forEach(function(p){
+   var pts=circPts(p[0].x,p[0].y,s,80);
+   var tube=mkTube(pts,.016,p[1],circOp*.6);
+   if(tube)GRP.rt.add(tube);
+ });
+ var aAB=Math.atan2(vB.y-vA.y,vB.x-vA.x),aAC=Math.atan2(vC.y-vA.y,vC.x-vA.x); var a1=aAB,a2=aAC; if(a2<a1)a2+=TAU; var pts=arcPts(vA.x,vA.y,s,a1,a2,80); var tube=mkTube(pts,.016,0xe06a5a,op); if(tube)GRP.rt.add(tube);
+ var aBa=Math.atan2(vA.y-vB.y,vA.x-vB.x),aBc=Math.atan2(vC.y-vB.y,vC.x-vB.x); var b1=aBa,b2=aBc; if(b2>b1)b2-=TAU; pts=arcPts(vB.x,vB.y,s,b1,b2,80); tube=mkTube(pts,.016,0x5ab48a,op); if(tube)GRP.rt.add(tube);
+ var aCa=Math.atan2(vA.y-vC.y,vA.x-vC.x),aCb=Math.atan2(vB.y-vC.y,vB.x-vC.x); var c1=aCa,c2=aCb; if(c2<c1)c2+=TAU; pts=arcPts(vC.x,vC.y,s,c1,c2,80); tube=mkTube(pts,.016,0x5a8ac0,op); if(tube)GRP.rt.add(tube);
+ [[vA,0xe06a5a],[vB,0x5ab48a],[vC,0x5a8ac0]].forEach(function(p){GRP.rt.add(mkSph(p[0],.06,p[1],op,p[1]));});
+}
+function buildHex(prog){clear(GRP.hex); 
+ var op=Math.min(prog*1.4,1); 
+ var pts=[vA,vB,vC,vA]; var tube=mkTube(pts,.018,0xe0a050,op*.8); if(tube)GRP.hex.add(tube);
+ var pts2=[vPAB,vPAC,vPBC,vPAB]; tube=mkTube(pts2,.018,0x50a0e0,op*.8); if(tube)GRP.hex.add(tube);
+ [[vA,vPBC],[vB,vPAC],[vC,vPAB]].forEach(function(p){var t=mkTube([p[0],p[1]],.015,0xb070c8,op*.4); if(t)GRP.hex.add(t);});
+ [vPAB,vPAC,vPBC].forEach(function(v){GRP.hex.add(mkSph(v,.06,0xffcc44,op,0x443300));});
+}
+var forkD=0.001;
+function buildFork(prog){clear(GRP.fork); 
+ var d=0.001+prog*(s*sq3-0.001); forkD=d; 
+ var uB=new THREE.Vector3().subVectors(vB,vA).normalize(); var uC=new THREE.Vector3().subVectors(vC,vA).normalize(); var uDv=new THREE.Vector3().subVectors(vD,vA).normalize(); 
+ var tipB=new THREE.Vector3().copy(vA).addScaledVector(uB,Math.min(d,s*sq3)); 
+ var tipC=new THREE.Vector3().copy(vA).addScaledVector(uC,Math.min(d,s*sq3)); 
+ var tipD2=new THREE.Vector3().copy(vA).addScaledVector(uDv,Math.min(d,s)); 
+ var tb=mkTube([vA,tipB],.025,0xe05555,.95); if(tb)GRP.fork.add(tb);
+ var tc=mkTube([vA,tipC],.025,0x4a7abf,.95); if(tc)GRP.fork.add(tc);
+ var td=mkTube([vA,tipD2],.025,0xf1c40f,.95); if(td)GRP.fork.add(td);
+ GRP.fork.add(mkSph(vA,.06,0xffffff,1,0x223344));
+ GRP.fork.add(mkSph(tipB,.045,0xe05555,1,0x441111));
+ GRP.fork.add(mkSph(tipC,.045,0x4a7abf,1,0x112244));
+ GRP.fork.add(mkSph(tipD2,.045,0xf1c40f,1,0x443300));
+}
+function buildTetSph(prog){clear(GRP.tet);clear(GRP.sph); 
+ var verts=[vA,vB,vC,vD]; var vcols=[0xe05555,0x5ab48a,0x4a7abf,0xf1c40f]; var edges=[[0,1],[0,2],[1,2],[0,3],[1,3],[2,3]]; var op=Math.min(prog*2,1); 
+ edges.forEach(function(e){var ecol=0x88a8d8; if(e[0]===0&&e[1]===1)ecol=0xe05555; if(e[0]===0&&e[1]===2)ecol=0x4a7abf; if(e[0]===0&&e[1]===3)ecol=0xf1c40f; var t=mkTube([verts[e[0]],verts[e[1]]],.02,ecol,.85*op); if(t)GRP.tet.add(t);}); 
+ verts.forEach(function(v,i){GRP.tet.add(mkSph(v,.06,vcols[i],op,vcols[i]));}); 
+ var sg=Math.min(prog*2,1); if(sg>.02){verts.forEach(function(v,i){GRP.sph.add(mkWire(v,OUTER_EXACT*sg*.9,vcols[i],.08*sg)); GRP.sph.add(mkWire(v,INNER_EXACT*sg*.9,vcols[i],.14*sg)); var sm=new THREE.Mesh(new THREE.SphereGeometry(s*sg*.95,22,16),new THREE.MeshPhongMaterial({color:vcols[i],transparent:true,opacity:.04*sg,shininess:30,side:THREE.DoubleSide})); sm.position.copy(v); GRP.sph.add(sm);});} if(prog>.5){var mOp=(prog-.5)*2; var cen=new THREE.Vector3((vA.x+vB.x+vC.x+vD.x)/4,(vA.y+vB.y+vC.y+vD.y)/4,(vA.z+vB.z+vC.z+vD.z)/4); var outerShell=new THREE.Mesh(new THREE.SphereGeometry(OUTER_EXACT,28,20),new THREE.MeshBasicMaterial({color:0x9a6cff,transparent:true,opacity:.04*mOp,wireframe:true})); outerShell.position.copy(cen); GRP.sph.add(outerShell); var innerShell=new THREE.Mesh(new THREE.SphereGeometry(INNER_EXACT,22,16),new THREE.MeshBasicMaterial({color:0x50c0b0,transparent:true,opacity:.08*mOp,wireframe:true})); innerShell.position.copy(cen); GRP.sph.add(innerShell);}}
+function bcVert(n,ph,sign,yMid){var a=(n*THETA_BC*sign)+ph; return new THREE.Vector3(R_BC*Math.cos(a),n*H_BC-(yMid||0),R_BC*Math.sin(a));}
+function buildHelix(prog,hand){clear(GRP.helix); 
+ var nTets=Math.max(3,Math.floor(prog*30)); helixN=nTets; var yMid=nTets*H_BC/2; var stackCols=SCOLS; 
+ for(var si=0;si<N_STACKS;si++){var cs=SSTATE[si]; var yOff=(si-(N_STACKS-1)/2)*STACK_H_SEP; var sg=new THREE.Group(); sg.position.y=yOff; 
+ sg.add(mkTube([new THREE.Vector3(0,-yMid,0),new THREE.Vector3(0,nTets*H_BC-yMid,0)],.03,0x6f8fb5,.35)||new THREE.Group()); 
+ var cyl=new THREE.Mesh(new THREE.CylinderGeometry(R_BC,R_BC,nTets*H_BC,24,1,true),new THREE.MeshPhongMaterial({color:stackCols[si],transparent:true,opacity:.04*(cs.amp+.05),side:THREE.DoubleSide,depthWrite:false})); cyl.position.y=(nTets*H_BC)/2-yMid; sg.add(cyl); 
+ for(var strand=0;strand<3;strand++){var pts=[]; for(var n=0;n<=nTets;n++)pts.push(bcVert(n,strand*TAU/3,hand,yMid)); var tb=mkTube(pts,.03,stackCols[si],Math.max(.1,cs.amp*.85)); if(tb)sg.add(tb);} 
+ for(var n=0;n<Math.min(nTets,10);n++){var vs=[0,1,2,3].map(function(k){return bcVert(n+k,0,hand,yMid);}); var edgs=[[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]]; edgs.forEach(function(e){if(Math.abs(vs[e[0]].distanceTo(vs[e[1]])-s)<.025){var t=mkTube([vs[e[0]],vs[e[1]]],.015,0x7a8aa8,cs.amp*.14); if(t)sg.add(t);}});} 
+ for(var n=0;n<=nTets;n+=3){var v=bcVert(n,0,hand,yMid); sg.add(mkWire(v,OUTER_EXACT*.42,stackCols[si],cs.amp*.07)); sg.add(mkWire(v,INNER_EXACT*.42,stackCols[si],cs.amp*.12)); var csph=mkSph(v,.05,stackCols[si],Math.max(.05,cs.amp*.9),stackCols[si]); sg.add(csph); var pulse=cs.amp*(0.8+0.35*Math.sin(ST.t*cs.hz/55+cs.phase+(n*.2))); csph.material.emissiveIntensity=.28+pulse*.5; var sc2=1+pulse*.25; csph.scale.set(sc2,sc2,sc2);} 
+ var markers=[{n:1,col:0xffd700},{n:10,col:0x44ccff},{n:30,col:0xff55aa}]; markers.forEach(function(mk){if(mk.n>nTets)return; var v=bcVert(mk.n,0,hand,yMid); var m=new THREE.Mesh(new THREE.TetrahedronGeometry(.2,0),new THREE.MeshStandardMaterial({color:mk.col,emissive:mk.col,emissiveIntensity:3,roughness:.05,metalness:.9,transparent:true,opacity:.85*cs.amp+.05})); m.position.copy(v); sg.add(m); var r=new THREE.Mesh(new THREE.TorusGeometry(.28,.015,8,28),new THREE.MeshStandardMaterial({color:mk.col,emissive:mk.col,emissiveIntensity:1.8,transparent:true,opacity:.7*cs.amp+.05})); r.position.copy(v); sg.add(r);}); 
+ var VOID_R_RING=R_BC*0.55; var voidOpBase=cs.amp*0.55+0.06; for(var n=0;n<=nTets;n+=3){var vCen=bcVert(n,0,hand,yMid); for(var face=0;face<3;face++){var faceAng=(face/3)*TAU + n*THETA_BC*hand; var offR=INNER_EXACT*0.7; var rx=vCen.x+Math.cos(faceAng)*offR; var rz=vCen.z+Math.sin(faceAng)*offR; var ry=vCen.y; var ringPos=new THREE.Vector3(rx,ry,rz); var vRingGeo=new THREE.TorusGeometry(VOID_R_RING,.02,8,36); var vRingMat=new THREE.MeshStandardMaterial({color:0x4af626,emissive:0x4af626,emissiveIntensity:1.2+cs.amp*1.8,transparent:true,opacity:voidOpBase*(0.7+0.3*Math.sin(ST.t*srcFreq/120+face*TAU/3+n*0.4)),roughness:.1,metalness:.8,depthWrite:false}); var vRing=new THREE.Mesh(vRingGeo,vRingMat); vRing.position.copy(ringPos); vRing.lookAt(new THREE.Vector3(0,ry,0)); vRing.rotateX(PI/2); sg.add(vRing); if(si<N_STACKS-1&&n===Math.floor(nTets/2)){var nextY=(si+1-(N_STACKS-1)/2)*STACK_H_SEP; var joinPts=[ringPos.clone(), new THREE.Vector3(rx,nextY,rz)]; var joinLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(joinPts),new THREE.LineBasicMaterial({color:0x4af626,transparent:true,opacity:Math.min(SSTATE[si+1].amp,cs.amp)*0.35,blending:THREE.AdditiveBlending,depthWrite:false})); sg.add(joinLine);}}} 
+ if(nTets>=30){var v30=bcVert(30,0,hand,yMid); var ring=new THREE.Mesh(new THREE.TorusGeometry(R_BC*2,.015,8,48),new THREE.MeshBasicMaterial({color:0xffcc44,transparent:true,opacity:.45*cs.amp})); ring.rotation.x=PI/2; ring.position.y=v30.y; sg.add(ring);} 
+ GRP.helix.add(sg);} 
+ if(ST.BOTH){var mg=new THREE.Group(); for(var strand=0;strand<3;strand++){var pts=[]; for(var n=0;n<=nTets;n++)pts.push(bcVert(n,strand*TAU/3,-hand,yMid)); var tb=mkTube(pts,.02,0x556677,.25); if(tb)mg.add(tb);} GRP.helix.add(mg);}}
+function trefoilPt(t){return new THREE.Vector3((2+Math.cos(3*t))*Math.cos(2*t),Math.sin(3*t),(2+Math.cos(3*t))*Math.sin(2*t));}
+function buildTrefoil(prog,hand){clear(GRP.trefoil); 
+ var cols=[0xe05555,0x5ab48a,0x4a7abf]; var seg=Math.max(8,Math.floor(prog*180)); 
+ for(var strand=0;strand<3;strand++){var off=strand*TAU/3; var pts=[]; for(var i=0;i<=seg;i++){var frac=i/180; if(frac*TAU>prog*TAU+.001)break; pts.push(trefoilPt(off+frac*TAU*hand).multiplyScalar(.65));} var tb=mkTube(pts,.05,cols[strand],.88); if(tb)GRP.trefoil.add(tb);} 
+ if(ST.BOTH){for(var strand=0;strand<3;strand++){var off=strand*TAU/3; var pts=[]; for(var i=0;i<=seg;i++){if((i/180)*TAU>prog*TAU+.001)break; pts.push(trefoilPt(off+(i/180)*TAU*(-hand)).multiplyScalar(.65));} var tb=mkTube(pts,.035,0x556677,.25); if(tb)GRP.trefoil.add(tb);}}}
+var torusMeshes=[];
+function buildTorus(prog){clear(GRP.torus); torusMeshes=[]; if(prog<.05)return; var op=prog; var R_tor=1.35,r_tor=0.42; var torusGeo=new THREE.TorusGeometry(R_tor,r_tor,32,80); var twMat=new THREE.MeshBasicMaterial({color:0x4af626,wireframe:true,transparent:true,opacity:.12*op}); var tw=new THREE.Mesh(torusGeo,twMat); GRP.torus.add(tw); torusMeshes.push(tw); var tsMat=new THREE.MeshPhongMaterial({color:0x223a22,emissive:0x112211,shininess:40,transparent:true,opacity:.09*op,side:THREE.DoubleSide,depthWrite:false}); var ts=new THREE.Mesh(torusGeo,tsMat); GRP.torus.add(ts); torusMeshes.push(ts); for(var i=0;i<3;i++){var ang=(i/3)*TAU; var rg=new THREE.Mesh(new THREE.TorusGeometry(R_tor,.015,8,64),new THREE.MeshStandardMaterial({color:SCOLS[i],emissive:SCOLS[i],emissiveIntensity:2,transparent:true,opacity:.55*op})); rg.rotation.x=PI/2; rg.rotation.z=ang; GRP.torus.add(rg); torusMeshes.push(rg);} var voidR=new THREE.Mesh(new THREE.TorusGeometry(R_tor-r_tor*.6,.025,8,48),new THREE.MeshStandardMaterial({color:0xffd700,emissive:0xffd700,emissiveIntensity:1.5,transparent:true,opacity:.4*op})); voidR.rotation.x=PI/2; GRP.torus.add(voidR); torusMeshes.push(voidR); var outerT=new THREE.Mesh(new THREE.TorusGeometry(R_tor+r_tor*.45,.02,8,64),new THREE.MeshBasicMaterial({color:0x44ccff,transparent:true,opacity:.2*op,wireframe:false})); outerT.rotation.x=PI/2; GRP.torus.add(outerT); GRP.torus.rotation.x=PI/4; GRP.torus.rotation.y=PI/6;}
+var fracLv=2; var LVLCOL=[0x50c0b0,0xb070c8,0xe0a050,0x5a8ac0,0x5ab48a,0xe05555];
+function hexOff(R){var o=[new THREE.Vector3(0,0,0)]; for(var i=0;i<6;i++){var a=i*PI/3; o.push(new THREE.Vector3(2*R*Math.cos(a),0,2*R*Math.sin(a)));} return o;}
+function buildFractal(prog,hand){clear(GRP.fractal); 
+ var nTets=fracLv<=2?18:(fracLv===3?10:6); var strandCols=[0xe05555,0x5ab48a,0x4a7abf]; 
+ function place(cen,lv,R,H){var sign=hand; var col=LVLCOL[Math.min(lv,5)]; var cyl2=new THREE.Mesh(new THREE.CylinderGeometry(R,R,nTets*H,22,1,true),new THREE.MeshPhongMaterial({color:col,transparent:true,opacity:.06,side:THREE.DoubleSide,depthWrite:false,shininess:20})); cyl2.position.copy(cen); GRP.fractal.add(cyl2); if(lv===0){for(var st=0;st<3;st++){var pts=[]; for(var n=0;n<=nTets;n++){var a=(n*THETA_BC*sign)+st*TAU/3; pts.push(new THREE.Vector3(cen.x+R*Math.cos(a),cen.y+n*H-nTets*H/2,cen.z+R*Math.sin(a)));} var rad=Math.max(.008,.024*Math.pow(.6,fracLv-1)); var tb=mkTube(pts,rad,strandCols[st],.88); if(tb)GRP.fractal.add(tb); for(var n=0;n<=nTets;n+=4){var v=new THREE.Vector3(cen.x+R*Math.cos(n*THETA_BC*sign),cen.y+n*H-nTets*H/2,cen.z+R*Math.sin(n*THETA_BC*sign)); GRP.fractal.add(mkWire(v,R*.38,col,.06));}} return;} var subs=[]; hexOff(R/2).forEach(function(o){var sub=new THREE.Vector3(cen.x+o.x,cen.y,cen.z+o.z); subs.push(sub); place(sub,lv-1,R/2,H/2);}); for(var i=1;i<7;i++){var t=mkTube([subs[0],subs[i]],.015,col,.2); if(t)GRP.fractal.add(t); var t2=mkTube([subs[i],subs[i%6+1]],.01,col,.12); if(t2)GRP.fractal.add(t2);}}
+ var topR=R_BC*Math.pow(2,fracLv-1), topH=H_BC*Math.pow(2,fracLv-1); place(new THREE.Vector3(0,0,0),fracLv-1,topR,topH);}
+
+function setStageVis(){
+ Object.values(GRP).forEach(function(g){g.visible=false;}); stackGrp.visible=false;
+ var cur=STAGE_GRPS[stageIdx]||[]; cur.forEach(function(k){if(GRP[k])GRP[k].visible=true;});
+ if(stageIdx>=4)stackGrp.visible=true;
+ if(ST.GHOSTS){for(var i=0;i<stageIdx;i++){(STAGE_GRPS[i]||[]).forEach(function(k){if(GRP[k]&&cur.indexOf(k)<0){GRP[k].visible=true; GRP[k].traverse(function(o){if(o.material){if(o._bop===undefined)o._bop=o.material.opacity; o.material.transparent=true; o.material.opacity=Math.min(o._bop*.28,.22);}});}});} cur.forEach(function(k){if(GRP[k])GRP[k].traverse(function(o){if(o.material&&o._bop!==undefined){o.material.opacity=o._bop; o._bop=undefined;}});});}
+}
+function rebuildAll(){rebuildBoundaries(); updateResonance(ST.t); buildRT(1); if(stageIdx>=1)buildHex(1); if(stageIdx>=2)buildFork(stageIdx===2?stageProg:1); if(stageIdx>=3)buildTetSph(stageIdx===3?stageProg:1); if(stageIdx>=4)buildHelix(stageIdx===4?stageProg:1,ST.HAND); if(stageIdx>=5)buildTrefoil(stageIdx===5?stageProg:1,ST.HAND); if(stageIdx>=6)buildTorus(stageIdx===6?stageProg:1); if(stageIdx>=7)buildFractal(stageProg,ST.HAND); setStageVis();}
+function rebuildCurrent(prog){stageProg=prog; updateResonance(ST.t); if(stageIdx===0)buildRT(prog); else if(stageIdx===1)buildHex(prog); else if(stageIdx===2)buildFork(prog); else if(stageIdx===3)buildTetSph(prog); else if(stageIdx===4)buildHelix(prog,ST.HAND); else if(stageIdx===5)buildTrefoil(prog,ST.HAND); else if(stageIdx===6)buildTorus(prog); else if(stageIdx===7)buildFractal(prog,ST.HAND); setStageVis();}
+
+// ── AUDIO ─────────────────────────────────────────────────────────────
+var actx=null, oscs=[], gains=[], gMaster, audioReady=false;
+var EIGEN_TYPES=['sine','sine','sine','triangle','sine','sine','sine','triangle','sine'];
+var EIGEN_RATIOS=[1,E_RATIO_CROSS,E_RATIO_LO,E_RATIO_HI,E_RATIO_APEX,E_RATIO_INNER,2,COMMA_R,SQRT6/9*4];
+function initAudio(){if(actx)return; try{actx=new(window.AudioContext||window.webkitAudioContext)(); gMaster=actx.createGain(); gMaster.gain.value=.18; gMaster.connect(actx.destination); var rv=actx.createConvolver(); var rb=actx.createBuffer(2,Math.floor(actx.sampleRate*2.8),actx.sampleRate); for(var ch=0;ch<2;ch++){var dd=rb.getChannelData(ch); for(var ii=0;ii<dd.length;ii++)dd[ii]=(Math.random()*2-1)*Math.pow(1-ii/dd.length,1.85);} rv.buffer=rb; var dry=actx.createGain(); dry.gain.value=.62; dry.connect(gMaster); var wet=actx.createGain(); wet.gain.value=.38; rv.connect(wet); wet.connect(gMaster); for(var i=0;i<N_STACKS;i++){var o=actx.createOscillator(), g=actx.createGain(); o.type=EIGEN_TYPES[i]; o.frequency.value=srcFreq*EIGEN_RATIOS[i]; g.gain.value=0; o.connect(g); g.connect(dry); g.connect(rv); o.start(); oscs.push(o); gains.push(g);} audioReady=true; if(actx.state==='suspended')actx.resume();}catch(e){console.warn('Audio:',e);}}
+function updateAudio(){if(!audioReady)return; var now=actx.currentTime, vol=.2; for(var i=0;i<N_STACKS;i++){var cs=SSTATE[i]; var pd=1+Math.sin(cs.phase)*.0012; var targetHz=srcFreq*EIGEN_RATIOS[i]*pd; oscs[i].frequency.setTargetAtTime(targetHz,now,.08); var g=vol*(cs.amp/Math.sqrt(i+1))*.8; gains[i].gain.setTargetAtTime(Math.max(0,g),now,.08);}}
+
+// ── PARTICLES ────────────────────────────────────────────────────────
+var PC=2800; var TOR_R_CONST=(N_STACKS-1)*STACK_H_SEP/(2*PI); var TOR_r_CONST=3*Math.sqrt(3)/10*4;
+var EF_HUES=[48,165,210,270,30,15,55,185,0];
+function hslToRgb(h,s,l){h/=360; var r,g,b; if(s===0){r=g=b=l;}else{function hue2rgb(p,q,t){if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p;} var q=l<0.5?l*(1+s):l+s-l*s, p=2*l-q; r=hue2rgb(p,q,h+1/3); g=hue2rgb(p,q,h); b=hue2rgb(p,q,h-1/3);} return [r,g,b];}
+var pG=new THREE.BufferGeometry(); var pP=new Float32Array(PC*3), pV=new Float32Array(PC*3), pC=new Float32Array(PC*3); var pSI=new Uint8Array(PC);
+for(var pi=0;pi<PC;pi++){var i3=pi*3; var colH2=(N_STACKS-1)*STACK_H_SEP; var inCore=(Math.random()<0.4); var pa=Math.random()*TAU; var pr2=inCore?Math.random()*R_BC*1.1:R_BC*1.5+Math.random()*R_BC*5; pP[i3]=pr2*Math.cos(pa); pP[i3+1]=(Math.random()-.5)*colH2; pP[i3+2]=pr2*Math.sin(pa); pV[i3]=(Math.random()-.5)*.008; pV[i3+1]=inCore?Math.random()*.02:-Math.random()*.012; pV[i3+2]=(Math.random()-.5)*.008; pSI[pi]=pi%N_STACKS; var hc=new THREE.Color(SCOLS[pi%N_STACKS]); pC[i3]=hc.r; pC[i3+1]=hc.g; pC[i3+2]=hc.b;}
+pG.setAttribute('position',new THREE.BufferAttribute(pP,3)); pG.setAttribute('color',new THREE.BufferAttribute(pC,3));
+var pMat=new THREE.PointsMaterial({size:.09,vertexColors:true,transparent:true,opacity:.88,blending:THREE.AdditiveBlending,depthWrite:false});
+scene.add(new THREE.Points(pG,pMat));
+
+function updateParticles(){
+ var pa2=pG.attributes.position, lift=ST.K>.8; var freqFac=srcFreq/220; var totalAmp=0; for(var i=0;i<N_STACKS;i++)totalAmp+=SSTATE[i].amp; totalAmp/=N_STACKS; var chiral=ST.HAND;
+ for(var pi=0;pi<PC;pi++){var i3=pi*3,x=pa2.getX(pi),y=pa2.getY(pi),z=pa2.getZ(pi); var si2=pi%N_STACKS; var cs2=SSTATE[si2]; var stackY=(si2-(N_STACKS-1)/2)*STACK_H_SEP; var r2d=Math.sqrt(x*x+z*z);
+ if(lift){x+=pV[i3]*(1+ST.K*1.4*freqFac)+(Math.random()-.5)*freqFac*.014; y+=pV[i3+1]*(1+ST.K*.5)+(Math.random()-.5)*.008; z+=pV[i3+2]*(1+ST.K*1.4*freqFac)+(Math.random()-.5)*freqFac*.014;}else{x+=pV[i3]*.25; y+=pV[i3+1]*.20; z+=pV[i3+2]*.25; if(r2d>0.2){var nTetsLocal=helixN; var yMidLocal=nTetsLocal*H_BC/2; var yLocal=y-stackY+yMidLocal; var nLocal=Math.max(0,Math.min(nTetsLocal,yLocal/H_BC)); var screwAng=nLocal*THETA_BC*chiral; var strandX=R_BC*Math.cos(screwAng), strandZ=R_BC*Math.sin(screwAng); var dsx=x-strandX, dsz=z-strandZ; var strandDist=Math.sqrt(dsx*dsx+dsz*dsz); var fieldStr=cs2.amp/(1+strandDist*strandDist*4)*0.018*freqFac; var tx=-(z/r2d)*fieldStr*chiral; var tz=(x/r2d)*fieldStr*chiral; x+=tx; z+=tz; var screwY=H_BC/R_BC; y+=fieldStr*screwY*chiral*0.4;} var rXZ2=Math.sqrt(x*x+z*z); if(rXZ2>0.2){var torCircStr=cs2.amp*0.006*freqFac*chiral; var torTx=-(z/rXZ2)*torCircStr; var torTz=(x/rXZ2)*torCircStr; x+=torTx; z+=torTz;} var rXZ3=Math.sqrt(x*x+z*z); var clX3=(rXZ3>0.01?x/rXZ3:1)*TOR_R_CONST; var clZ3=(rXZ3>0.01?z/rXZ3:0)*TOR_R_CONST; var polX=x-clX3, polY=y, polZ=z-clZ3; var polR=Math.sqrt(polX*polX+polY*polY+polZ*polZ); if(polR>0.1){var polStr=cs2.amp*0.004*freqFac; var tubeTx=-(clZ3/TOR_R_CONST), tubeTz=(clX3/TOR_R_CONST); var pnX=polX/polR, pnY=polY/polR, pnZ=polZ/polR; var polTanX=pnY*tubeTz - pnZ*0; var polTanY=pnZ*tubeTx - pnX*tubeTz; var polTanZ=pnX*0 - pnY*tubeTx; x+=polTanX*polStr; y+=polTanY*polStr; z+=polTanZ*polStr;} var torusAngle=Math.atan2(z,x); var pressure=Math.sin(torusAngle*freqFac*3+ST.t*freqFac*0.4+cs2.phase)*cs2.amp*0.007; var rXZ4=Math.sqrt(x*x+z*z); if(rXZ4>0.01){var clX4=x/rXZ4*TOR_R_CONST, clZ4=z/rXZ4*TOR_R_CONST; x+=(x-clX4)*pressure; z+=(z-clZ4)*pressure; y+=pressure*0.5;}} pV[i3]*=.9992; pV[i3+1]*=.9992; pV[i3+2]*=.9992; var rXZ=Math.sqrt(x*x+z*z); var distCL=Math.sqrt((rXZ-TOR_R_CONST)*(rXZ-TOR_R_CONST)+y*y); if(distCL>TOR_r_CONST*1.35){var pushStr=(distCL-TOR_r_CONST)/TOR_r_CONST*0.06; var clX=(rXZ>0.01?x/rXZ:1)*TOR_R_CONST; var clZ=(rXZ>0.01?z/rXZ:0)*TOR_R_CONST; x+=(clX-x)*pushStr; y+=(0-y)*pushStr; z+=(clZ-z)*pushStr; pV[i3]*=0.92; pV[i3+1]*=0.92; pV[i3+2]*=0.92;} pa2.setXYZ(pi,x,y,z);}
+ pa2.needsUpdate=true;
+ var colAttr=pG.attributes.color; if(colAttr){for(var ci=0;ci<PC;ci++){var ci3=ci*3; var cx=pa2.getX(ci), cy=pa2.getY(ci), cz=pa2.getZ(ci); var crXZ=Math.sqrt(cx*cx+cz*cz); var cdCL=Math.sqrt((crXZ-TOR_R_CONST)*(crXZ-TOR_R_CONST)+cy*cy); var heat=Math.max(0,1-cdCL/TOR_r_CONST); heat=heat*heat; var csi=pSI[ci]||ci%N_STACKS; var cs3=SSTATE[csi]; var sAmp=cs3?cs3.amp:0; heat*=(0.25+sAmp*0.75); var efH=EF_HUES[csi]||0; var hue=heat*efH+(1-heat)*220; var sat=0.25+heat*0.75; var lit=0.12+heat*0.68; if(cs3&&cs3.hz){var efP=Math.sin(ST.t*cs3.hz/55+cs3.phase)*0.5+0.5; lit=Math.min(0.98,lit+efP*heat*0.15);} var rgb=hslToRgb(hue,sat,lit); colAttr.setXYZ(ci,rgb[0],rgb[1],rgb[2]);} colAttr.needsUpdate=true;}
+ pMat.size=.07+freqFac*.04+totalAmp*.03; pMat.opacity=.72+totalAmp*.24;
+}
+
+// ── HUD & CONTROLS ──────────────────────────────────────────────────
+function renderHUD(){
+ var S=STAGES[stageIdx]; if(!S)return;
+ document.getElementById('s-num').textContent=S.st+' / '+STAGES.length;
+ document.getElementById('s-name').innerHTML=S.name;
+ document.getElementById('s-desc').innerHTML=S.desc;
+ document.getElementById('s-form').innerHTML='<div class="formula">'+S.form+'</div>';
+ document.getElementById('s-chips').innerHTML=S.chips.map(function(c){return '<span class="chip '+c[1]+'">'+c[0]+'</span>';}).join('');
+ var html='';
+ if(stageIdx===2)html='<div class="lab">Sweep d <span class="ro" id="rd-d"></span></div><input type="range" class="slider" id="sl-d" min="1" max="1000" value="'+Math.round(stageProg*1000)+'">';
+ if(stageIdx===3)html='<div class="lab">Sphere growth <span class="ro" id="rd-sp"></span></div><input type="range" class="slider" id="sl-sp" min="1" max="1000" value="'+Math.round(stageProg*1000)+'">';
+ if(stageIdx===4)html='<div class="lab">Chain n <span class="ro" id="rd-n"></span></div><input type="range" class="slider" id="sl-n" min="3" max="1000" value="'+Math.round(stageProg*1000)+'">';
+ if(stageIdx===5)html='<div class="lab">Trefoil closure <span class="ro" id="rd-tf"></span></div><input type="range" class="slider" id="sl-tf" min="1" max="1000" value="'+Math.round(stageProg*1000)+'">';
+ if(stageIdx===6)html='<div class="lab">Torus emergence <span class="ro" id="rd-to"></span></div><input type="range" class="slider" id="sl-to" min="1" max="1000" value="'+Math.round(stageProg*1000)+'">';
+ if(stageIdx===7)html='<div class="lab">Fractal levels <span class="ro" id="rd-lv">'+fracLv+'</span></div><input type="range" class="slider" id="sl-lv" min="1" max="4" step="1" value="'+fracLv+'">';
+ document.getElementById('stage-x').innerHTML=html;
+ function bind(id){var e=document.getElementById(id); if(e)e.oninput=function(){stageProg=e.value/1000; rebuildCurrent(stageProg); updateRO();};}
+ bind('sl-d'); bind('sl-sp'); bind('sl-n'); bind('sl-tf'); bind('sl-to');
+ if(stageIdx===7){var sl=document.getElementById('sl-lv'); if(sl)sl.oninput=function(){fracLv=+sl.value; document.getElementById('rd-lv').textContent=fracLv; rebuildCurrent(stageProg);};}
+ updateRO(); renderDots();
+}
+function updateRO(){
+ if(stageIdx===2){var d=forkD; var th=TAU/3-2*Math.asin(Math.min(d/(2*s),1)); var e=document.getElementById('rd-d'); if(e)e.textContent='d='+d.toFixed(2)+'  θ='+(th/PI*180).toFixed(1)+'°';}
+ if(stageIdx===3){var e=document.getElementById('rd-sp'); if(e)e.textContent=stageProg<.5?Math.round(stageProg*200)+'%':'+ membrane';}
+ if(stageIdx===4){var e=document.getElementById('rd-n'); if(e)e.textContent=helixN+' tets';}
+ if(stageIdx===5){var e=document.getElementById('rd-tf'); if(e)e.textContent=Math.round(stageProg*100)+'%';}
+ if(stageIdx===6){var e=document.getElementById('rd-to'); if(e)e.textContent=Math.round(stageProg*100)+'%';}
+ document.getElementById('scrubval').textContent='Stage '+(stageIdx+1);
+}
+function renderDots(){var d=document.getElementById('dots'); d.innerHTML=''; for(var i=0;i<STAGES.length;i++){var dot=document.createElement('div'); dot.className='dot'+(i===stageIdx?' active':(i<stageIdx?' done':'')); dot.setAttribute('data-i',i); d.appendChild(dot);} d.querySelectorAll('.dot').forEach(function(dot){dot.onclick=function(){gotoStage(+dot.getAttribute('data-i'),1);};});}
+function gotoStage(i,prog){stageIdx=Math.max(0,Math.min(STAGES.length-1,i)); stageProg=prog===undefined?1:prog; ST.holdT=0; rebuildAll(); applyCam(stageIdx); renderHUD(); document.getElementById('b-prev').disabled=stageIdx===0; document.getElementById('b-next').disabled=stageIdx===STAGES.length-1;}
+function applyCam(i){if(FLY.active)return; var cams=[[.45,.62,5.5],[.45,.64,6.5],[.5,.9,5.5],[.6,1.0,7],[.55,1.05,22],[.5,1.0,16],[.4,.85,12],[.7,1.1,32],[.55,1.2,20]]; var c=cams[Math.min(i,cams.length-1)]; if(!c)c=[.55,1,18]; orb.th=c[0]; orb.ph=c[1]; orb.r=c[2]; orb.px=0; orb.py=(i>=4?0:.1); camUp();}
+
+// ── STACK PANEL ──────────────────────────────────────────────────────
+function buildStackPanel(){var c=document.getElementById('stack-rows'); SCOLS.forEach(function(col,i){var hex='#'+new THREE.Color(col).getHexString(); var div=document.createElement('div'); div.className='sr'; div.innerHTML='<div class="sdot" id="sd'+i+'" style="background:'+hex+'"></div><span class="slbl">stack '+(i+1)+(i===0?' ·src':'')+' </span><span class="shz" id="sh'+i+'">—</span><div class="sbar"><div class="sbf" id="sb'+i+'" style="background:'+hex+';width:0%"></div></div><span class="sobl" id="so'+i+'">0%</span>'; c.appendChild(div);});}
+function updateStackPanel(){for(var i=0;i<N_STACKS;i++){var cs=SSTATE[i]; var h=document.getElementById('sh'+i), b=document.getElementById('sb'+i), ob=document.getElementById('so'+i), dot=document.getElementById('sd'+i); if(!h)continue; h.textContent=cs.amp>.025?Math.round(cs.hz)+'Hz':'—'; h.style.opacity=.3+cs.amp*.7; b.style.width=Math.round(cs.amp*100)+'%'; ob.textContent=Math.round(cs.obstr*100)+'%'; var col=new THREE.Color(SCOLS[i]); dot.style.boxShadow=cs.amp>.12?'0 0 '+(cs.amp*9).toFixed(0)+'px #'+col.getHexString():'none';}}
+
+// ── MATH OVERLAY ────────────────────────────────────────────────────
+function updateMathOverlay(){
+ var html='<div style="text-align:left;max-width:600px;margin:0 auto;">';
+ html+='<p><b>Core equation:</b> (1 ≬ 1) ⊢ 3</p>';
+ html+='<p><b>BC helix:</b> θ_BC = '+THETA_BC.toFixed(6)+' rad ('+(THETA_BC*180/PI).toFixed(2)+'°), R = '+R_BC.toFixed(4)+'s, H = '+H_BC.toFixed(4)+'s</p>';
+ html+='<p><b>Dimensionless curvature:</b> κ̃ = '+kappa_tilde.toFixed(6)+', τ̃ = '+tau_tilde.toFixed(6)+'</p>';
+ html+='<p><b>Continued fraction:</b> ['+cf.join(', ')+']</p>';
+ html+='<p><b>Convergents:</b> '+convs.map(function(c){return c.p+'/'+c.q;}).join(', ')+'</p>';
+ html+='<p><b>Closure gaps:</b> n=1: '+(gaps[1]*180/PI).toFixed(2)+'°, n=10: '+(gaps[10]*180/PI).toFixed(2)+'°, n=30: '+(gaps[30]*180/PI).toFixed(2)+'°, n=61: '+(gaps[61]*180/PI).toFixed(2)+'°</p>';
+ html+='<p><b>Exact gap at n=30:</b> '+gap30_deg.toFixed(3)+'°</p>';
+ html+='<p><b>Euler–Mascheroni constant:</b> γ = '+euler_gamma.toFixed(6)+'</p>';
+ html+='<p><b>Gamma polynomial expansions (at r=R_BC, C_i=0):</b></p>';
+ html+='<p>V₂ = πr² = '+V2_val.toFixed(6)+'</p>';
+ html+='<p>V₃ = π/3 r³ = '+V3_val.toFixed(6)+'</p>';
+ html+='<p>V₄ = π/4 r⁴ + γ/2 r² = '+V4_val.toFixed(6)+'</p>';
+ html+='<p>V₅ = π/6 r⁵ + γ/6 r³ + γ/2 r² = '+V5_val.toFixed(6)+'</p>';
+ html+='<p>V₆ = π/36 r⁶ + γ/24 r⁴ + γ/6 r³ + γ/2 r² = '+V6_val.toFixed(6)+'</p>';
+ html+='<p><b>Self-determination:</b> g = '+G_SELF.toFixed(4)+', T = '+T_SELF.toFixed(4)+', g·T = '+(G_SELF*T_SELF).toFixed(2)+', g·T² = '+(G_SELF*T_SELF*T_SELF).toFixed(2)+'s</p>';
+ html+='</div>';
+ document.getElementById('math-body').innerHTML = html;
+}
+document.getElementById('b-math').addEventListener('click',function(){var ov=document.getElementById('math-overlay'); if(ov.style.display==='block')ov.style.display='none'; else{updateMathOverlay(); ov.style.display='block';}});
+
+// ── CONTROLS ────────────────────────────────────────────────────────
+document.getElementById('b-next').onclick=function(){gotoStage(stageIdx+1,1);};
+document.getElementById('b-prev').onclick=function(){gotoStage(stageIdx-1,1);};
+document.getElementById('b-rst').onclick=function(){applyCam(stageIdx);};
+document.getElementById('b-3d').onclick=function(){orb.th=.6; orb.ph=1.06; orb.r=Math.max(orb.r,8); orb.px=0; orb.py=stageIdx>=4?0:.1; camUp();};
+function setHand(h,both){ST.HAND=h; ST.BOTH=both; document.getElementById('h-l').classList.toggle('on',h===-1&&!both); document.getElementById('h-r').classList.toggle('on',h===1&&!both); document.getElementById('h-b').classList.toggle('on',both); rebuildAll();}
+document.getElementById('h-l').onclick=function(){setHand(-1,false);};
+document.getElementById('h-r').onclick=function(){setHand(1,false);};
+document.getElementById('h-b').onclick=function(){setHand(1,true);};
+var bGhost=document.getElementById('b-ghost'); bGhost.onclick=function(){ST.GHOSTS=!ST.GHOSTS; bGhost.textContent=ST.GHOSTS?'On':'Off'; bGhost.classList.toggle('on',ST.GHOSTS); rebuildAll();};
+function setPlay(on){ST.playing=on; document.getElementById('p-pl').textContent=on?'⏸':'▶'; document.getElementById('b-play').textContent=on?'⏸ Pause':'▶ Auto-play'; document.getElementById('b-play').classList.toggle('on',on);}
+document.getElementById('b-play').onclick=function(){setPlay(!ST.playing);};
+document.getElementById('p-pl').onclick=function(){setPlay(!ST.playing);};
+document.getElementById('p-fw').onclick=function(){setPlay(false); gotoStage(stageIdx+1,1);};
+document.getElementById('p-bk').onclick=function(){setPlay(false); gotoStage(stageIdx-1,1);};
+document.getElementById('scrub').oninput=function(){setPlay(false); var v=this.value/1000; var f=v*STAGES.length; var si=Math.min(STAGES.length-1,Math.floor(f)); var sp=f-si; stageIdx=si; stageProg=si===STAGES.length-1?1:Math.max(.02,sp); rebuildAll(); applyCam(si); renderHUD();};
+document.getElementById('src-slider').addEventListener('input',function(){srcFreq=parseFloat(this.value); document.getElementById('src-hz').textContent=srcFreq+' Hz';});
+var sweepActive=false, sweepT=0, sweepSpeed=0.35, sweepMin=55, sweepMax=880;
+document.getElementById('b-sweep').addEventListener('click',function(){sweepActive=!sweepActive; this.textContent=sweepActive?'■ Stop':'▷ Sweep'; this.style.background=sweepActive?'rgba(255,215,0,.25)':'rgba(255,215,0,.08)';});
+document.getElementById('sweep-speed').addEventListener('change',function(){sweepSpeed=parseFloat(this.value);});
+
+// ── FLASH ────────────────────────────────────────────────────────────
+var flashEl=document.getElementById('flash'), flashT=0;
+function doFlash(sym){flashEl.textContent=sym; flashEl.style.opacity='1'; flashT=.7;}
+
+// ── EVOLVE ──────────────────────────────────────────────────────────
+function evolve(dt){var prev=ST.K; ST.K+=dt*.018*Math.sin(ST.t*.65)+dt*.008*(Math.random()-.5); ST.K=Math.min(Math.max(ST.K,0),2); if(prev<.8&&ST.K>=.8){ST.ticks++; doFlash('⊢');} if(prev<1.5&&ST.K>=1.5){ST.ticks++; doFlash('⌊RESET⌋');} if(prev>=1.5&&ST.K<1.5)doFlash('↑ LIFT'); if(ST.K>=1.5)scene.background.set(0x180101); else if(ST.K>.8){scene.background.set(0x010c04); tl.intensity=1.2;} else{scene.background.set(0x0a0f1a); tl.intensity=.3;}}
+
+// ── FREQUENCY WARP ──────────────────────────────────────────────────
+var freqWarpTarget=1.0, freqWarpCurrent=1.0, freqWarpVel=0.0; var freqDampK=8.0, freqDampD=1.6;
+function freqToWarp(f){return Math.pow(220/f,0.28);}
+function updateFreqWarp(dt){if(sweepActive){sweepT+=dt*sweepSpeed; srcFreq=Math.round(sweepMin+((Math.sin(sweepT)+1)/2)*(sweepMax-sweepMin)); var sl=document.getElementById('src-slider'); if(sl)sl.value=srcFreq; document.getElementById('src-hz').textContent=srcFreq+' Hz';} freqWarpTarget=freqToWarp(srcFreq); var force=(freqWarpTarget-freqWarpCurrent)*freqDampK - freqWarpVel*freqDampD*2*Math.sqrt(freqDampK); freqWarpVel+=force*dt; freqWarpCurrent+=freqWarpVel*dt; var w=freqWarpCurrent; var wx=w*(1+Math.sin(ST.t*(srcFreq/440)*0.8)*.016); var wy=(1/w)*(1+Math.cos(ST.t*(srcFreq/440)*0.6)*.012); ['rt','hex','fork','tet','sph','helix','trefoil','fractal'].forEach(function(k){if(GRP[k]&&GRP[k].visible)GRP[k].scale.set(wx,wy,wx);}); if(GRP.torus.visible){var tw=w*(1+Math.sin(ST.t*(srcFreq/330))*.045); GRP.torus.scale.set(tw,1/(tw*.82),tw);}}
+
+// ── GATE ────────────────────────────────────────────────────────────
+function enter(){
+  console.log("enter() called");
+  initAudio();
+  document.getElementById('gate').classList.add('gone');
+  renderer.render(scene,cam);
+  gotoStage(0,1);
+}
+document.getElementById('initBtn').addEventListener('click', enter);
+document.getElementById('gate').addEventListener('click', function(e){
+  if(e.target === this || e.target.tagName === 'DIV' || e.target.tagName === 'H1' || e.target.tagName === 'SPAN' || e.target.tagName === 'P'){
+    enter();
+  }
+});
+
+// ── MAIN LOOP ──────────────────────────────────────────────────────
+var lastT=performance.now();
+function tick(now){requestAnimationFrame(tick); var dt=Math.min((now-lastT)/1000,.05); lastT=now; ST.t+=dt; evolve(dt); updateResonance(ST.t);
+ if(ST.playing){if(ST.holdT>0){ST.holdT-=dt; if(ST.holdT<=0){if(stageIdx<STAGES.length-1)gotoStage(stageIdx+1,0); else setPlay(false);}}else{stageProg+=dt*.38; if(stageProg>=1){stageProg=1; rebuildCurrent(1); ST.holdT=stageIdx<STAGES.length-1?1.2:0; if(stageIdx>=STAGES.length-1)setPlay(false);}else rebuildCurrent(stageProg);} document.getElementById('scrub').value=Math.round(((stageIdx+stageProg)/STAGES.length)*1000); updateRO();}
+ if(GRP.torus.visible){var totalAmp=0; for(var i=0;i<N_STACKS;i++)totalAmp+=SSTATE[i].amp; totalAmp/=N_STACKS; var g_disp=G_SELF*0.0133; var w1=2*g_disp; var w2=3*g_disp; GRP.torus.rotation.y=ST.t*w1; GRP.torus.rotation.x=ST.t*w2; GRP.torus.rotation.z=Math.sin(ST.t*g_disp)*0.18; torusMeshes.forEach(function(m,i){if(m.material){var p=totalAmp*(.8+.3*Math.sin(ST.t*srcFreq/80+i*TAU/3)); m.material.opacity=Math.min(p*.55+.05,1);}});}
+ updateFly(dt); pl.intensity=.7+.35*Math.sin(ST.t*(srcFreq/440)*1.6)*(1+SSTATE[0].amp*.3); camUp();
+ if(stageIdx>=4)updateStackPanel(); if(flashT>0){flashT-=dt; flashEl.style.opacity=Math.max(0,flashT/.35).toFixed(2);}
+ updateFreqWarp(dt); updateParticles(); updateAudio(); renderer.render(scene,cam);
+}
+window.addEventListener('resize',function(){cam.aspect=window.innerWidth/window.innerHeight; cam.updateProjectionMatrix(); renderer.setSize(window.innerWidth,window.innerHeight);});
+// Start the loop
+requestAnimationFrame(tick);
+// Initial render
+gotoStage(0,1);
+</script>
+</body>
+</html>
